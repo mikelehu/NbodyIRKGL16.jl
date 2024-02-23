@@ -1,5 +1,13 @@
 
+function coord_bar(out,u)
+    
+  @. out[:,1,1]=u[:,3,1]-u[:,1,1]
+  @. out[:,2,1]=u[:,1,1]-u[:,2,1]
+  @. out[:,3,1]=u[:,2,1]-u[:,3,1]
+  
+  return copy(out)
 
+end
 
 
 function NbodyEnergy3REL(u,Gm)
