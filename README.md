@@ -61,13 +61,15 @@ We consider the initial values at Julian day (TDB) 2440400.5 (the 28th of June o
 
 We run a numerical integration back in time for $t=2e7$ days where a close approach between Ceres and Bamberga asteroids occurs.
 
+Jupyter notebook :  "/Examples/15-body Solar System integration.ipynb"
+
 ### Step 1: Defining  the problem
 
 To solve this numerically, we define a problem type by giving it the equation, the initial
 condition, and the timespan to solve over:
 
 ```julia
-using NbodyIRKGL16
+using .IRKGL_SIMD
 using Plots, LinearAlgebra
 
 PATH_ODES="../../ODEProblems/"
@@ -75,75 +77,6 @@ include(string(PATH_ODES,"Initial15Body.jl"))
 include(string(PATH_ODES,"Nbody.jl"));
 ```
 
-```julia
-function NbodyODE_fstep!(F,u,Gm,t,part)
-
-   N = length(Gm)
-
-   if part==1  # Evaluate dq/dt
-
-      for i in 1:3, j in 1:N
-         F[i,j,1] = u[i,j,2]
-      end
-
-      sinv=zero(eltype(typeof(u)))
-   
-   else        # Evaluate dv/dt
-
-      kappa=3^2   
-
-      A = zero(eltype(u))
-      B = zero(eltype(u))
-      C = zero(eltype(u))
-
-      for i in 1:N
-         for k in 1:3
-            F[k, i, 2] = 0
-         end
-      end
-
-      for i in 1:N
-         xi = u[1,i,1]
-         yi = u[2,i,1]
-         zi = u[3,i,1]
-         vxi = u[1,i,2]
-         vyi = u[2,i,2]
-         vzi = u[3,i,2]
-         Gmi = Gm[i]
-         for j in i+1:N
-            xij = xi - u[1,j,1]
-            yij = yi - u[2,j,1]
-            zij = zi - u[3,j,1]
-            vxij = vxi - u[1,j,2]
-            vyij = vyi - u[2,j,2]
-            vzij = vzi - u[3,j,2]
-            Gmj = Gm[j]
-            invnorm2qij =1/(xij*xij+yij*yij+zij*zij)
-            invnormqij = sqrt(invnorm2qij)
-            auxij = invnorm2qij * invnormqij
-            Gmjauxij = Gmj*auxij
-            F[1,i,2] -= Gmjauxij*xij
-            F[2,i,2] -= Gmjauxij*yij
-            F[3,i,2] -= Gmjauxij*zij
-            Gmiauxij = Gmi*auxij
-            F[1,j,2] += Gmiauxij*xij
-            F[2,j,2] += Gmiauxij*yij
-            F[3,j,2] += Gmiauxij*zij
-            norm2vij = vxij*vxij+vyij*vyij+vzij*vzij
-            A += (norm2vij*invnorm2qij)^2
-            B += (Gmi+Gmj)*invnorm2qij
-            C += invnorm2qij 
-         end
-      end
-
-      sinv = (kappa*A  + B^2 * C)^(1/4)    # 0.25
-   
-   end
-
-   return sinv
-
-end
-```
 
 ```julia
 
@@ -155,6 +88,8 @@ show(bodylist)
 t0=fltype(0.)
 tF=fltype(-2e4)  
 tspan= (t0,tF)
+
+# NbodyODE_fstep!() is defined in "Nbody.jl" file.
 prob = ODEProblem(NbodyODE_fstep!, u0,tspan , Gm);
 
 ```
@@ -217,35 +152,12 @@ plot(pl1,pl2,pl3, layout=(1,3), size=(1200,300))
 
 #### Error in Energy
 
-```julia
-function NbodyEnergy(u,Gm)
-
-     N = length(Gm)
-     zerouel = zero(eltype(u))
-     T = zerouel
-     U = zerouel
-     for i in 1:N
-        qi = u[2,:,i]
-        vi = u[1,:,i]
-        Gmi = Gm[i]
-        T += Gmi*(vi[1]*vi[1]+vi[2]*vi[2]+vi[3]*vi[3])
-        for j in (i+1):N
-           qj = u[2,:,j]  
-           Gmj = Gm[j]
-           qij = qi - qj
-           U -= Gmi*Gmj/norm(qij)
-        end
-     end
-
-    1/2*T + U
-
-end
-```
 
 
 ```julia
 yrange=(1e-18,1e-14)
 
+# NbodyEnergy() is defined in "Nbody.jl" file.
 E0=NbodyEnergy(BigFloat.(u0), BigFloat.(Gm))
 ΔE = map(x->NbodyEnergy(BigFloat.(x),BigFloat.(Gm)), sol.u)./E0.-1;
 
@@ -329,16 +241,20 @@ plot(pl1,pl2, layout=(1,2), size=(900,300))
 
 ## References
 
-
-- [1] Global Time-Renormalization of the Gravitational N-body Problem, M. Antoñana, P. Chartier, J. Makazaga and A. Murua. SIAM Journal on Applied Dynamical System (2020). https://doi.org/10.1137/20M1314719.
-
-- [2] Reversible Long-Term Integration with Variable Stepsizes,  E.Hairer and  D. Stoffer.
+- [1] Reversible Long-Term Integration with Variable Stepsizes,  E.Hairer and  D. Stoffer.
 SIAM Journal on Scientific Computing (1997).
 https://doi.org/10.1137/S1064827595285494
+
+- [2] Global Time-Renormalization of the Gravitational N-body Problem, M. Antoñana, P. Chartier, J. Makazaga and A. Murua. SIAM Journal on Applied Dynamical System (2020). https://doi.org/10.1137/20M1314719.
+
+- [3] Majorant series for the N-body problem,   M. Antoñana, P. Chartier and A. Murua.
+Iternational Journal of Computer Mathematics (2021).
+https://doi.org/10.1080/00207160.2021.1962848
 
 ## Repository
 
 -https://github.com/mikelehu/NbodyIRKGL16.jl
+
 
 
 

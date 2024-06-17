@@ -269,8 +269,7 @@ function NbodyODE_fstep!(F,u,Gm,t,part)
    end
 
    return sinv
-   
-   
+
 end
 
 
