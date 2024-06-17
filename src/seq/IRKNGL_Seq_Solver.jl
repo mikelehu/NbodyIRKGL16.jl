@@ -1,15 +1,21 @@
-@enum retcode begin
-    Success
-    Failure
-end
 
 struct IRKNGL_Cache{uT,tT,fT,pT}
     odef::fT # function defining the ODE system
     p::pT # parameters 
     b::Vector{tT}
     c::Vector{tT}
+    a::Array{tT,2}
     mu::Array{tT,2}
     nu::Array{tT,2}
+    theta::Array{tT,2}
+    omega::Array{tT,2}
+    alpha::Array{tT,2}
+    d::Vector{tT}
+    K::Vector{tT}
+    logK::Vector{tT}
+    Kinv::Vector{tT}
+    Tau::Vector{tT}
+    Tau_::Vector{tT}
     U::Vector{uT}
     U_::Vector{uT}
     L::Vector{uT}
@@ -17,26 +23,25 @@ struct IRKNGL_Cache{uT,tT,fT,pT}
     Dmin::Array{tT,1}
     maxiters::Int64
     step_number::Array{Int64,0}
-    initial_extrap::Array{Int64,0}
+    initial_extrap::Bool
     length_u::Int64
     length_q::Int64
     tf::tT
-    step_retcode::retcode
+    Dtau::tT
 end
 
 
-
-abstract type IRKNAlgorithm{s,initial_extrap, m} <: OrdinaryDiffEqAlgorithm end
-struct IRKNGL_seq{s,initial_extrap, m} <: IRKNAlgorithm{s, initial_extrap, m} end
-IRKNGL_seq(;s=8, initial_extrap=1, m=1)=IRKNGL_seq{s, initial_extrap, m}()
+abstract type IRKNAlgorithm{s, initial_extrapolation, mstep} <: OrdinaryDiffEqAlgorithm end
+struct IRKNGL_seq{s,initial_extrapolation, mstep} <: IRKNAlgorithm{s, initial_extrapolation, mstep} end
+IRKNGL_seq(;s=8, initial_extrapolation=true, mstep=1)=IRKNGL_seq{s, initial_extrapolation, mstep}()
 
 function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,isinplace},
-    alg::IRKNGL_seq{s, initial_extrap, m}, args...;
-    dt=0.,
-    save_everystep=true,
-    adaptive=false,
+    alg::IRKNGL_seq{s, initial_extrapolation, mstep}, args...;
+    dt=zero(eltype(tspanType)),
+    save_on=true,
+    adaptive=true,
     maxiters=100,
-    kwargs...) where {uType,tspanType,isinplace,s,initial_extrap, m}
+    kwargs...) where {uType,tspanType,isinplace,s,initial_extrapolation, mstep}
 
     checks=true
 
@@ -55,22 +60,27 @@ function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,
     end
 
     tType=eltype(tspanType)
+    Dtau=convert(tType,dt) # Only used if adaptive=true
 
 #   Memory preallocation (IRKNL_Cache)  
 
     step_number = Array{Int64,0}(undef)
     step_number[] = 0
-    init_interp =  Array{Int64,0}(undef)
-    init_interp[] = initial_extrap
+    init_extrap = initial_extrapolation
 
-    (b, c, mu, nu) = IRKGLCoefficients(s,dt)
+    (b, c, a, mu, nu, theta, omega, d) = IRKGLCoefficients(tType,s)
+    K = similar(b)
+    logK = similar(b)
+    Kinv = similar(b)
+    Tau = similar(b)
+    Tau_ = (1 .+ c)*Dtau
+    alpha=similar(theta)
     length_u = length(u0)
     length_q=div(length_u,2)
     dims = size(u0)
     indices=1:length_u
     indices1 = 1: length_q
     indices2 = (length_q+1):length_u
-    step_retcode::retcode=Success
 
     U=Array{uType}(undef, s)
     for i in 1:s
@@ -81,28 +91,22 @@ function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,
     L=deepcopy(U)
     F=deepcopy(U)
 
-
-    Dmin=Array{uiType}(undef,length_q)
+    Dmin=Array{uiType}(undef,length_u)
     Dmin.=zero(uiType)
  
     dtprev=zero(tType)
     signdt=sign(tspan[2]-tspan[1]) 
-           
-    if signdt==1           # forward integration
-        t0=prob.tspan[1]
-        tf=prob.tspan[2]   
-    else                   # backward integration
-        t0=prob.tspan[2]
-        tf=prob.tspan[1]   
-    end
+    
+    t0=prob.tspan[1]
+    tf=prob.tspan[2]  
 
     dts=[dt,dtprev,signdt]
 
-    irkngl_cache = IRKNGL_Cache(f,p,b,c,mu,nu,
+    irkngl_cache = IRKNGL_Cache(f,p,b,c,a, mu,nu,theta,omega,alpha,d,
+                                K,logK,Kinv,Tau,Tau_,
                                 U, U_, L, 
                                 F,Dmin,maxiters,step_number,
-                                init_interp,length_u,length_q,tf,
-                                step_retcode)
+                                init_extrap,length_u,length_q,tf,Dtau)
 #
 
     uu = uType[]
@@ -115,67 +119,103 @@ function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,
     uj = copy(u0)  
     ej=zero(u0)  
     
-    tstops=tType[]
-
-    if dt== 0.
-        println("Error: dt required for fixed timestep.")
+    if dt==0.
+        @warn("Requires a choice of dt>0")
         checks=false
     end
 
-    if adaptive==true
-        println("Error: only allowed adaptive =false")
-        checks=false
-    end
-
-    if checks==true
+    if checks
                                      
         cont=true
         error_warn=0
-        
-        while cont
+        if !adaptive dt=min(dt,abs(tf-t0)) end
+        dts=[dt,dtprev,signdt] 
 
-            for i in 1:m 
+        if adaptive 
 
-                step_number[] += 1
+            dts[1] = zero(tType)
 
-                IRKNGLstep_fixed!(tj,uj,ej,dts,stats,irkngl_cache)
-  
-                if (step_retcode==Failure)
-                    error_warn=1
-                    break                 
-                end
+            while cont
+
+                for i in 1:mstep 
+
+                    step_number[] += 1
+
+                    step_retcode = Main.IRKNGLstep_adap!(tj,uj,ej,dts,stats,irkngl_cache)
+
+                    if !step_retcode
+                        error_warn=1
+                        cont=false                 
+                    end
                
-                if (dts[1]==0) cont=false  end
+                    if (tj[1]==tf)  
+                        cont=false  
+                        break
+                    end
             
-            end
+                end
   
-            if save_everystep !=false
-                push!(uu,uj+ej)
-                push!(tt,tj[1]+tj[2])
-            end
+                if save_on 
+                    push!(uu,copy(uj))
+                    push!(tt,tj[1])
+                end
 
-        end # end while
+            end 
+
+        else
+            
+            while cont
+
+                for i in 1:mstep 
+
+                    step_number[] += 1
+
+                    step_retcode = Main.IRKNGLstep_fixed!(tj,uj,ej,dts,stats,irkngl_cache)
+
+                    if !step_retcode
+                        error_warn=1
+                        cont=false                 
+                    end
+               
+                    if (tj[1]==tf)  
+                        cont=false  
+                        break
+                    end
+            
+                end
+  
+                if save_on 
+                    push!(uu,copy(uj))
+                    push!(tt,tj[1])
+                end
+
+            end 
+
+        end
 
         stats.naccept=step_number[]
-        if error_warn!=0
 
-            println("Error during the integration warn=$error_warn")
+        if error_warn!=0
+            @warn("Error during the integration warn=$error_warn")
             sol=DiffEqBase.build_solution(prob,alg,tt,uu,stats=stats,retcode= ReturnCode.Failure)
         
         else
-            if tt[end]!=tf
-                push!(uu,uj+ej)
-                push!(tt,tj[1]+tj[2])
+
+            if !save_on
+                push!(uu,copy(uj))
+                push!(tt,tj[1])
             end
 
             sol=DiffEqBase.build_solution(prob,alg,tt,uu,stats=stats,retcode= ReturnCode.Success)
         end
 
-        return(sol)
+    else
+
+        sol=DiffEqBase.build_solution(prob,alg,tt,uu,stats=stats,retcode= ReturnCode.Failure)
        
     end 
   
+    return(sol)
   
-  end
-
+end
 

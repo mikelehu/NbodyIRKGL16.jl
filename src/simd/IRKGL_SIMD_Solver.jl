@@ -1,16 +1,22 @@
-@enum retcode begin
-    Success
-    Failure
-end
-
 
 struct IRKGL_SIMD_Cache{floatT,fType,pType,s_,dim_}
     odef::fType # function defining the ODE system
     p::pType # parameters and so
     b::Vec{s_,floatT}
     c::Vec{s_,floatT}
+    a::VecArray{s_,floatT,2}
     mu::VecArray{s_,floatT,2}
     nu::VecArray{s_,floatT,2}
+    theta::VecArray{s_,floatT,2}
+    omega::VecArray{s_,floatT,2}
+    alpha::VecArray{s_,floatT,2}
+    d::Vec{s_,floatT}
+    s_beta::Vec{s_,floatT}
+    K::Vec{s_,floatT}    
+    logK::Vec{s_,floatT} 
+    Kinv::Vec{s_,floatT}
+    Tau::Vec{s_,floatT} 
+    Tau_::Vec{s_,floatT}  
     U::VecArray{s_,floatT,dim_}
     U_::VecArray{s_,floatT,dim_}
     L::VecArray{s_,floatT,dim_}
@@ -18,24 +24,24 @@ struct IRKGL_SIMD_Cache{floatT,fType,pType,s_,dim_}
     Dmin::Array{floatT,1}
     maxiters::Int64
     step_number::Array{Int64,0}
-    initial_extrap::Array{Int64,0}
+    initial_extrap::Bool
     length_u::Int64
     tf::floatT
-    step_retcode::retcode
+    Dtau::floatT
 end
 
 
-abstract type IRKAlgorithm{s, initial_extrap,m, floatType} <: OrdinaryDiffEqAlgorithm end
-struct IRKGL_simd{s, initial_extrap,m, floatType} <: IRKAlgorithm{s, initial_extrap,m, floatType} end
-IRKGL_simd(;s=8, initial_extrap=1,m=1, floatType=Float64)=IRKGL_simd{s, initial_extrap,m, floatType}()
+abstract type IRKAlgorithm{s, initial_extrapolation, mstep, floatType} <: OrdinaryDiffEqAlgorithm end
+struct IRKGL_simd{s, initial_extrapolation, mstep, floatType} <: IRKAlgorithm{s, initial_extrapolation, mstep, floatType} end
+IRKGL_simd(;s=8, initial_extrapolation=true, mstep=1, floatType=Float64)=IRKGL_simd{s, initial_extrapolation, mstep, floatType}()
 
 function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,isinplace},
-    alg::IRKGL_simd{s,initial_extrap, m, floatType}, args...;
-    dt=0.,
-    save_everystep=true,
-    adaptive=false,
+    alg::IRKGL_simd{s, initial_extrapolation, mstep, floatType}, args...;
+    dt=zero(eltype(tspanType)),
+    save_on=true,
+    adaptive=true,
     maxiters=100,
-    kwargs...) where {floatType<: Union{Float32,Float64},uType,tspanType,isinplace,s,initial_extrap, m}
+    kwargs...) where {floatType<: Union{Float32,Float64},uType,tspanType,isinplace,s,initial_extrapolation, mstep}
 
     checks=true
 
@@ -49,27 +55,37 @@ function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,
 
     tType=eltype(tspanType)
     uiType=eltype(uType)
+    Dtau=convert(tType,dt) # Only used if adaptive=true
  
 #   Memory preallocation (IRKL_Cache)   
 
     step_number = Array{Int64,0}(undef)
     step_number[] = 0
-    init_interp =  Array{Int64,0}(undef)
-    init_interp[] = initial_extrap
+    init_extrap = initial_extrapolation
 
-    (b_, c_, mu_, nu_) = IRKGLCoefficients(s,dt)
+    (b_, c_, a_, mu_, nu_, theta_, omega_, d_) = IRKGLCoefficients(tType,s)
+
     length_u = length(u0)
     dims = size(u0)
-    indices=1:length_u
-    step_retcode::retcode=Success
 
-    c = vload(Vec{s,floatType}, c_, 1)
     b = vload(Vec{s,floatType}, b_, 1)
+    c = vload(Vec{s,floatType}, c_, 1)
+    a=VecArray{s,floatType,2}(a_)
     nu=VecArray{s,floatType,2}(nu_)
     mu=VecArray{s,floatType,2}(mu_)
+    theta=VecArray{s,floatType,2}(theta_)
+    omega=VecArray{s,floatType,2}(omega_)
+    alpha=deepcopy(theta)
+    d = vload(Vec{s,floatType}, d_, 1)
+    s_beta= copy(b)
 
-    zz=zeros(Float64, s, dims...)
-    U=VecArray{s,Float64,length(dims)+1}(zz)
+    K = copy(b)
+    logK = copy(b)
+    Kinv = copy(b)
+    Tau = copy(b)
+    Tau_ = (1 + c)*Dtau
+    zz=zeros(floatType, s, dims...)
+    U=VecArray{s,floatType,length(dims)+1}(zz)
     U_=deepcopy(U)
     L=deepcopy(U)
     F=deepcopy(U)
@@ -77,28 +93,18 @@ function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,
     Dmin=Array{uiType}(undef,length_u)
     Dmin.=zero(uiType)
 
-
     dtprev=zero(tType)
     signdt=sign(tspan[2]-tspan[1])    
            
-    if signdt==1           # forward integration
-        t0=prob.tspan[1]
-        tf=prob.tspan[2]   
-    else                   # backward integration
-        t0=prob.tspan[2]
-        tf=prob.tspan[1]   
-    end
-
-    dts=[dt,dtprev,signdt]   
-
-
-    irkgl_cache = IRKGL_SIMD_Cache(f,p,b,c,mu,nu,
+    t0=prob.tspan[1]
+    tf=prob.tspan[2] 
+ 
+    irkgl_cache = IRKGL_SIMD_Cache(f,p,b,c,a, mu,nu, theta,omega,alpha,d,s_beta,
+                                   K,logK, Kinv, Tau, Tau_,
                                    U, U_, L, 
                                    F,Dmin,maxiters,step_number,
-                                   init_interp,length_u,tf,
-                                   step_retcode)
+                                   init_extrap,length_u,tf,Dtau)
 
-#
 
     uu = uType[]
     tt = tType[]
@@ -109,64 +115,105 @@ function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,
     tj = [t0, zero(t0)]
     uj = copy(u0)
     ej=zero(u0)    
-    
-                            
+                               
     if dt==0.
-        println("Error: dt required for fixed timestep.")
+        @warn("Requires a choice of dt>0")
         checks=false
     end
 
-    if adaptive==true
-        println("Error: only allowed adaptive =false")
-        checks=false
-    end
 
-    if checks==true
-
+    if checks
+ 
        cont=true
        error_warn=0
+       if !adaptive dt=min(dt,abs(tf-t0)) end
+       dts=[dt,dtprev,signdt] 
 
-       while cont
+       if adaptive
 
-            for i in 1:m 
+            dts[1] = zero(tType)
 
-                step_number[] += 1
-                IRKGLstep_SIMD_fixed!(tj,uj,ej,dts,stats,irkgl_cache)
-  
-                if (step_retcode==Failure)
-                    error_warn=1
-                    break
-                end
+            while cont
+
+                for i in 1:mstep 
+
+                    step_number[] += 1
+                    step_retcode= Main.IRKGLstep_SIMD_adap!(tj,uj,ej,dts,stats,irkgl_cache)
+
+                    if !step_retcode
+                        error_warn=1
+                        cont = false
+                    end
  
-                if dts[1]==0 cont=false end
+                    if (tj[1]==tf)  
+                        cont=false  
+                        break
+                    end
         
-            end
+                end
 
-            if save_everystep !=false
-                push!(uu,uj+ej)
-                push!(tt,tj[1]+tj[2])
-            end
+                if save_on
+                    push!(uu,copy(uj))
+                    push!(tt,tj[1])
+                end
 
-        end # while
+            end 
+
+       else
+
+            while cont
+
+                for i in 1:mstep 
+
+                    step_number[] += 1
+                    step_retcode= Main.IRKGLstep_SIMD_fixed!(tj,uj,ej,dts,stats,irkgl_cache)
+
+                    if !step_retcode
+                        error_warn=1
+                        cont = false
+                    end
+ 
+                    if (tj[1]==tf)  
+                        cont=false  
+                        break
+                    end
+        
+                end
+
+                if save_on
+                    push!(uu,copy(uj))
+                    push!(tt,tj[1])
+                end
+
+            end 
+
+        end
 
         stats.naccept=step_number[]
+        
         if error_warn!=0
 
-            println("Error during the integration warn=$error_warn")
+            @warn("Error during the integration warn=$error_warn")
             sol=DiffEqBase.build_solution(prob,alg,tt,uu,stats=stats,retcode= ReturnCode.Failure)
         
         else
-            if tt[end]!=tf
-                push!(uu,uj+ej)
-                push!(tt,tj[1]+tj[2])
+
+
+            if !save_on
+                push!(uu,copy(uj))
+                push!(tt,tj[1])
             end
 
             sol=DiffEqBase.build_solution(prob,alg,tt,uu,stats=stats,retcode= ReturnCode.Success)
         end
 
-        return(sol)
+    else
+
+        sol=DiffEqBase.build_solution(prob,alg,tt,uu,stats=stats,retcode= ReturnCode.Failure)
  
     end 
+
+    return(sol)
 
 end
 

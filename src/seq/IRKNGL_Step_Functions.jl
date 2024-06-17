@@ -1,236 +1,732 @@
 #
 #  IRKNGLstep_fixed!
+#  IRKNGLstep_adap!
 
 
-function IRKNGLstep_fixed!(ttj, uj,ej, dts, stats, irkngl_cache::IRKNGL_Cache{uT,tT,fT,pT}) where {uT,tT,fT,pT}
+function IRKNGLstep_fixed!(ttj, uj,ej, dts, stats, irkngl_cache::IRKGL_SEQ.IRKNGL_Cache{uT,tT,fT,pT}) where {uT,tT,fT,pT}
 
  
- f = irkngl_cache.odef
- p = irkngl_cache.p
- b = irkngl_cache.b
- c = irkngl_cache.c
- mu = irkngl_cache.mu
- nu = irkngl_cache.nu
- U = irkngl_cache.U
- U_ = irkngl_cache.U_
- L = irkngl_cache.L
- F = irkngl_cache.F
- Dmin = irkngl_cache.Dmin
- step_number = irkngl_cache.step_number[]
- initial_extrap = irkngl_cache.initial_extrap[]
- len = length(uj)
- lenq = irkngl_cache.length_q
- tf = irkngl_cache.tf
- step_retcode = irkngl_cache.step_retcode
+    f = irkngl_cache.odef
+    p = irkngl_cache.p
+    b = irkngl_cache.b
+    c = irkngl_cache.c
+    mu = irkngl_cache.mu
+    nu = irkngl_cache.nu
+    U = irkngl_cache.U
+    U_ = irkngl_cache.U_
+    L = irkngl_cache.L
+    F = irkngl_cache.F
+    Dmin = irkngl_cache.Dmin
+    step_number = irkngl_cache.step_number[]
+    initial_extrap = irkngl_cache.initial_extrap[]
+    len = length(uj)
+    lenq = irkngl_cache.length_q
+    tf = irkngl_cache.tf
+
+    s = length(b)
+    maxiters = (step_number==1 ? 10+irkngl_cache.maxiters : irkngl_cache.maxiters )
+    tj = ttj[1]
+    te = ttj[2] 
 
 
- s = length(b)
- maxiters = (step_number==1 ? 10+irkngl_cache.maxiters : irkngl_cache.maxiters )
- tj = ttj[1]
- te = ttj[2] 
+    indices=eachindex(uj)
+    indices1 = 1:lenq
+    indices2 = (lenq+1):len
 
-
- indices=1:len
- indices1 = 1:lenq
- indices2 = (lenq+1):len
-
- dt=dts[1]
- dtprev=dts[2]
- signdt=dts[3]
- sdt=dt*signdt
- 
- j_iter = 0  # counter of fixed_point iterations
- nf=0
- nf2=0
-
- if (initial_extrap==1)
-     for is in 1:s
-         for k in indices2
-             dUik = muladd(nu[is,1], L[1][k], ej[k])
-             for js in 2:s
-                dUik = muladd(nu[is,js], L[js][k], dUik)
-             end
-             U[is][k] =  uj[k]  + dUik
-         end
-     end
- else
-     for is in 1:s
-         for k in indices2
-            U[is][k] = uj[k] + ej[k]
-         end
-     end
- end
+    dt=dts[1]
+    dtprev=dts[2]
+    signdt=dts[3]
+    sdt=dt*signdt
     
-    
- for is in 1:s
-     nf+=1
-     f(F[is], U[is], p,  tj  + sdt*c[is], 1 )
-     for k in indices1
-         L[is][k] = sdt*(b[is]*F[is][k])
-     end
- end
+    j_iter = 0  # counter of fixed_point iterations
+    nf=0
+    nf2=0
 
- for is in 1:s
-    for k in indices1
-        dUik = muladd(mu[is,1], L[1][k], ej[k])
-        for js in 2:s
-            dUik = muladd(mu[is,js], L[js][k], dUik)
+    step_retcode=true
+
+    if initial_extrap && (step_number>1)
+        for is in 1:s
+            for k in indices2
+                dUik = muladd(nu[is,1], L[1][k], ej[k])
+                for js in 2:s
+                    dUik = muladd(nu[is,js], L[js][k], dUik)
+                end
+                U[is][k] =  uj[k]  + dUik
+            end
         end
-        U[is][k] =  uj[k] + dUik
+    else
+        for is in 1:s
+            for k in indices2
+                U[is][k] = uj[k] + ej[k]
+            end
+        end
     end
- end
-
-
- Dmin .= Inf
-
- iter = true # Initialize iter outside the for loop
- plusIt=true
- diffU = true
-
-  
- @inbounds while (j_iter<maxiters && iter)  
-
-      iter = false
-      j_iter += 1
-
-      for is in 1:s
-        nf2+=1
-        f(F[is], U[is], p,  tj  + sdt*c[is], 2 )
-        for k in indices2
+            
+    for is in 1:s
+        nf+=1
+        f(F[is], U[is], p,  muladd(sdt,c[is],tj), 1 )
+        for k in indices1
             L[is][k] = sdt*(b[is]*F[is][k])
         end
-      end
+    end
 
-      for is in 1:s
-        for k in indices2
-           dUik = muladd(mu[is,1], L[1][k], ej[k])
-           for js in 2:s
-              dUik = muladd(mu[is,js], L[js][k], dUik)
-           end
-           U_[is][k] = U[is][k]
-           U[is][k] =  uj[k] + dUik
-        end
-      end
-        
-        
-      for is in 1:s
-          nf+=1
-          f(F[is], U[is], p,  tj  + sdt*c[is], 1 )
-          for k in indices1
-              L[is][k] = sdt*(b[is]*F[is][k])
-          end
-      end
-
-      for is in 1:s
-          for k in indices1
-             dUik = muladd(mu[is,1], L[1][k], ej[k])
-             for js in 2:s
+    for is in 1:s
+        for k in indices1
+            dUik = muladd(mu[is,1], L[1][k], ej[k])
+            for js in 2:s
                 dUik = muladd(mu[is,js], L[js][k], dUik)
-             end
-           U_[is][k] = U[is][k]
-           U[is][k] =  uj[k] + dUik
-          end
-      end
-
-
-      diffU = false
-
-      for k in indices1  
-
-          DY = abs(U[1][k]-U_[1][k])
-          for is in 2:s 
-              DY=max(abs(U[is][k]-U_[is][k]),DY)
-          end 
-
-          if DY>0
-              diffU = true
-              if DY< Dmin[k]
-                 Dmin[k]=DY
-                 iter=true
-              end
-          end
-      end
-
-      if (!iter && diffU && plusIt)
-          iter=true
-          plusIt=false
-      else
-          plusIt=true
-      end
-
-
-  end # while
-
-  if (!iter && (j_iter==maxiters))
-     println("Failure !!!  Step=",tj+te, " dt=", dts[1])
-     step_retcode=Failure
-     return nothing
-  
-  else
-  
-  @inbounds if (j_iter<maxiters && diffU)    #s=8 j_iter>22
-      j_iter += 1
-        
-      for is in 1:s
-        nf2+=1
-        f(F[is], U[is], p,  tj  + sdt*c[is], 2 )
-        for k in indices2
-            L[is][k] = sdt*(b[is]*F[is][k])
+            end
+            U[is][k] =  uj[k] + dUik
         end
-      end
+    end
 
-      for is in 1:s
-        for k in indices2
-           dUik = muladd(mu[is,1], L[1][k], ej[k])
-           for js in 2:s
-              dUik = muladd(mu[is,js], L[js][k], dUik)
-           end
-           U[is][k] =  uj[k] + dUik
+
+    Dmin .= Inf
+
+    iter = true # Initialize iter outside the for loop
+    plusIt=true
+    diffU = true
+
+    
+    @inbounds while (j_iter<maxiters && iter)  
+
+        iter = false
+        j_iter += 1
+
+        for is in 1:s
+            nf2+=1
+            f(F[is], U[is], p,  muladd(sdt,c[is],tj), 2 )
+            for k in indices2
+                L[is][k] = sdt*(b[is]*F[is][k])
+            end
         end
-      end
+
+        
+        for is in 1:s
+            for k in indices2
+                dUik = muladd(mu[is,1], L[1][k], ej[k])
+                for js in 2:s
+                    dUik = muladd(mu[is,js], L[js][k], dUik)
+                end
+                U_[is][k] = U[is][k]
+                U[is][k] =  uj[k] + dUik
+            end
+        end
+            
+            
+        for is in 1:s
+            nf+=1
+            f(F[is], U[is], p,  muladd(sdt,c[is],tj), 1 )
+            for k in indices1
+                L[is][k] = sdt*(b[is]*F[is][k])
+            end
+        end
+
+       
+        for is in 1:s
+            for k in indices1
+                dUik = muladd(mu[is,1], L[1][k], ej[k])
+                for js in 2:s
+                    dUik = muladd(mu[is,js], L[js][k], dUik)
+                end
+            U_[is][k] = U[is][k]
+            U[is][k] =  uj[k] + dUik
+            end
+        end
+
+
+        diffU = false
+
+        for k in indices  
+
+            DY = abs(U[1][k]-U_[1][k])
+            for is in 2:s 
+                DY=max(abs(U[is][k]-U_[is][k]),DY)
+            end 
+
+            if DY>0
+                diffU = true
+                if DY< Dmin[k]
+                    Dmin[k]=DY
+                    iter=true
+                end
+            end
+
+        end
+       
+        if (!iter && diffU && plusIt)
+            iter=true
+            plusIt=false
+        else
+            plusIt=true
+        end
+
+    end # while
+
+
+    if iter  # iter=false implies that j_iter==maxiters
+
+     @warn "Interrupted. Reached maximum number of iterations (maxiters=$maxiters). The value dt=$dt may be too large."
+     step_retcode=false
+  
+    end
+
+    if  step_retcode
+  
+        @inbounds if (j_iter<maxiters && diffU)    
+            j_iter += 1
+        
+            for is in 1:s
+                nf2+=1
+                f(F[is], U[is], p,  muladd(sdt,c[is],tj), 2 )
+                for k in indices2
+                    L[is][k] = sdt*(b[is]*F[is][k])
+                end
+            end
+
+            for is in 1:s
+                for k in indices2
+                    dUik = muladd(mu[is,1], L[1][k], ej[k])
+                    for js in 2:s
+                        dUik = muladd(mu[is,js], L[js][k], dUik)
+                    end
+                    U[is][k] =  uj[k] + dUik
+                end
+            end
         
         
-      for is in 1:s
-          nf+=1
-          f(F[is], U[is], p,  tj  + sdt*c[is], 1 )
-          for k in indices1
-              L[is][k] = sdt*(b[is]*F[is][k])
-          end
-      end
+            for is in 1:s
+                nf+=1
+                f(F[is], U[is], p,  muladd(sdt,c[is],tj), 1 )
+                for k in indices1
+                    L[is][k] = sdt*(b[is]*F[is][k])
+                end
+            end
 
-   end    
+        end    
 
-  @inbounds for k in indices    #Equivalent to compensated summation
+        @inbounds for k in indices    #Equivalent to compensated summation
 
-      L_sum = L[1][k]
-      for is in 2:s
-          L_sum+=L[is][k]
-      end
-      res = Base.TwicePrecision(uj[k], ej[k]) + L_sum
-      uj[k] = res.hi
-      ej[k] = res.lo
+            L_sum = L[1][k]
+            for is in 2:s
+                L_sum+=L[is][k]
+            end
+            res = Base.TwicePrecision(uj[k], ej[k]) + L_sum
 
-   end
+            uj[k] = res.hi
+            ej[k] = res.lo
 
-   res = Base.TwicePrecision(tj, te) + sdt
-   ttj[1] = res.hi
-   ttj[2] = res.lo
+        end
 
-   dts[1]=min(abs(dt),abs(tf-(ttj[1]+ttj[2])))
-   dts[2]=dt
+        dtmax = abs((tf-ttj[1])-ttj[2])
+        if abs(sdt) >= dtmax
+            ttj[1] = tf
+            ttj[2] = 0
+        else
+            res = Base.TwicePrecision(tj, te) + sdt
+            ttj[1] = res.hi
+            ttj[2] = res.lo
+        end
 
-   if dts[2]!=Inf
-      stats.nnonliniter+=j_iter
-      stats.nf+=nf
-      stats.nf2+=nf2
-   end
+        dts[1]=min(abs(sdt),dtmax)
+        dts[2]=dt
+
+        stats.nnonliniter+=j_iter
+        stats.nf+=nf
+        stats.nf2+=nf2
+
+    end
+
+   return step_retcode
+
+
+end
+
+function IRKNGLstep_adap!(ttj, uj,ej, dts, stats, irkngl_cache::IRKGL_SEQ.IRKNGL_Cache{uT,tT,fT,pT}) where {uT,tT,fT,pT}
+
+ 
+    f = irkngl_cache.odef
+    p = irkngl_cache.p
+    b = irkngl_cache.b
+    c = irkngl_cache.c
+    d = irkngl_cache.d
+    a = irkngl_cache.a
+    mu = irkngl_cache.mu
+    nu = irkngl_cache.nu
+    theta=irkngl_cache.theta
+    omega=irkngl_cache.omega
+    alpha=irkngl_cache.alpha
+    K = irkngl_cache.K
+    logK = irkngl_cache.logK
+    Kinv=irkngl_cache.Kinv
+    Tau = irkngl_cache.Tau
+    Tau_ = irkngl_cache.Tau_
+    U = irkngl_cache.U
+    U_ = irkngl_cache.U_
+    L = irkngl_cache.L
+    F = irkngl_cache.F
+    Dmin = irkngl_cache.Dmin
+    step_number = irkngl_cache.step_number[]
+    initial_extrap = irkngl_cache.initial_extrap[]
+    len = length(uj)
+    lenq = irkngl_cache.length_q
+    tf = irkngl_cache.tf
+    Dtau=irkngl_cache.Dtau
+
+    R=tT(2)^10 
    
-   retcode=Success
-   return nothing
+    s = length(b)
+    extra_iters = (step_number>1 && initial_extrap ? 1 : 9)
+    maxiters = irkngl_cache.maxiters + extra_iters - 1
+    tj = ttj[1]
+    te = ttj[2]
+    dtmax = abs((tf-tj)-te)  
 
-  end
+    indices=eachindex(uj)
+    indices1 = indices[1:lenq]
+    indices2 = indices[(lenq+1):len]
 
+    dtaux = dts[1]
+    dtaux_ = dtaux
+    dt = min(dtaux,dtmax)      # Initialized as dt=0 at first step
+    dtprev=dts[2]
+    signdt=dts[3]
+    sdt=signdt*dt
+       
+    step_retcode=true
 
+    nf=0
+    nf2=0
+       
+    if initial_extrap && step_number>1  # Initialize V-stages
+        
+        for is in 1:s
+           for k in indices2
+               dUik = muladd(nu[is,1], L[1][k], ej[k])
+               for js in 2:s
+                  dUik = muladd(nu[is,js], L[js][k], dUik)
+               end
+               U_[is][k] =  dUik  # U = uj + U_
+           end
+        end
+      
+        lambda=dt/dtprev-1
+     
+        if abs(lambda)>eps(tT) 
+          
+             for i in 1:s
+                 sumbetai=zero(tT)
+                 for j in 1:s+1
+                     aux=muladd(lambda,theta[i,j],omega[i,j])
+                     alpha[i,j]=1/aux
+                     sumbetai+=alpha[i,j]
+                 end
+              %
+                 for j in 1:s+1
+                     alpha[i,j]=alpha[i,j]/sumbetai
+                 end
+             end 
+
+             for is in 1:s
+                 for k in indices2
+                      dUik = alpha[is,1]*ej[k]
+                      for js in 1:s
+                          dUik = muladd(alpha[is,js+1], U_[js][k], dUik)
+                      end
+                      U[is][k] = uj[k] + dUik
+                 end
+             end              
+          
+        else    
+             for is in 1:s
+                 for k in indices2
+                      U[is][k] = uj[k] + U_[is][k]
+                 end
+             end 
+          
+        end    
+      
+    else
+        for is in 1:s
+            for k in indices2
+                 U[is][k] = uj[k] + ej[k]
+            end
+        end
+    end
+
+    @. mu = sdt*a
+
+    for is in 1:s
+        nf+=1
+        kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj),1)
+    end
+        
+    for is in 1:s   # Initialize Q-stages
+        for k in indices1
+            dUik = ej[k]
+            for js in 1:s
+                dUik = muladd(mu[is,js], F[js][k], dUik)
+            end
+        U[is][k] =  uj[k] + dUik 
+        end
+    end
+
+    if initial_extrap && step_number>1
+    
+          aux=zero(tT)
+          daux=zero(tT)
+
+          for is in 1:s
+            nf2+=1
+            kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj),2)
+            aux = muladd(b[is],kf,aux)
+            daux = muladd(d[is],kf,daux)
+          end   
+          
+          diff_dt = (Dtau - dt*aux)/daux   
+          dtaux = IRKGL_SEQ.Rdigits(dt + diff_dt,R)
+        
+    else
+          aux=zero(tT)
+          for is in 1:s
+            nf2+=1
+            kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj),2)
+            aux = muladd(b[is],kf,aux)
+          end
+          
+          dtaux = IRKGL_SEQ.Rdigits(Dtau/aux, R)
+    end
+       
+    iter = true # Initialize iter outside the for loop
+    plusIt=true
+    diffU = true
+    j_iter = 1  
+
+    if ((abs(dtaux-dtaux_)>0.5*max(dtaux,dtaux_)) && (step_number>1)) || (dtaux<=0) 
+
+        if dtaux<=0
+             @warn "dtaux<=0 --> dtaux=dtaux_, n=$step_number, j=$j_iter,  dt_=$dtaux_, dt=$dtaux"
+        end
+        
+        @debug("n=$step_number, j=$j_iter, tj=$(Float32(tj)), dtaux_=$(Float32(dtaux_)), dtaux=$(Float32(dtaux)), dt_re=$(Float64((abs(dtaux-dtaux_)/max(dtaux,dtaux_))))")
+        
+        if initial_extrap && (step_number>1)
+
+            for is in 1:s  # Reinitialize V-stages
+                for k in indices2
+                   U[is][k] = uj[k] + ej[k]
+                end
+            end
+
+            @. mu = sdt*a
+
+            for is in 1:s
+                nf+=1
+                kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj),1)
+            end
+        
+            for is in 1:s   # Reinitialize Q-stages
+                for k in indices1
+                    dUik = ej[k]
+                    for js in 1:s
+                        dUik = muladd(mu[is,js], F[js][k], dUik)
+                    end
+                    U[is][k] =  uj[k] + dUik 
+                end
+            end
+    
+            aux=zero(tT)
+            for is in 1:s
+               nf2+=1
+               kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj), 2)
+               aux = muladd(b[is],kf,aux)
+            end
+
+            initial_extrap = false
+            dtaux = IRKGL_SEQ.Rdigits(Dtau/aux,R)
+            Dmin .= Inf
+            diffU = true
+            j_iter = 1
+
+        else
+            @warn "Convergence failure. Numerical integration interrupted. \n The value of dt=$Dtau appears to be too large. Please try again with a smaller value of dt"
+            iter = false 
+            step_retcode=false
+        end
+    end  
+
+    dt_new=min(dtaux,dtmax)
+    sdt_new=signdt*dt_new  
+    dsdt = sdt_new-sdt
+   
+    Dmin .= Inf
+   
+
+    @inbounds while (j_iter<maxiters && iter)  
+   
+        @debug("n=$step_number, j=$j_iter, tj=$(Float32(tj)), dtaux_=$(Float32(dtaux_)), dtaux=$(Float32(dtaux)), dt_re=$(Float64((abs(dtaux-dtaux_)/max(dtaux,dtaux_))))")
+
+        iter = false
+
+        for is in 1:s
+            for js in 1:s
+                mu[js,is] = sdt*a[js,is] 
+            end
+            mu[is,is] += c[is]*dsdt
+        end
+
+        for is in 1:s
+           for k in indices2  
+              dUik = ej[k]
+              for js in 1:s
+                 dUik = muladd(mu[is,js], F[js][k], dUik)
+              end
+              U_[is][k] = U[is][k]
+              U[is][k] =  uj[k] + dUik
+           end
+        end
+           
+        @. mu = sdt_new * a
+     
+        for is in 1:s
+             nf+=1
+             kf=f(F[is], U[is], p,  muladd(sdt_new,c[is],tj), 1)   
+        end
+        
+        for is in 1:s
+            for k in indices1   
+                dUik = ej[k]
+                for js in 1:s
+                   dUik = muladd(mu[is,js], F[js][k], dUik)
+                end
+              U_[is][k] = U[is][k]
+              U[is][k] =  uj[k] + dUik
+            end
+        end
+      
+        diffU = false
+   
+        for k in indices 
+   
+             DY = abs(U[1][k]-U_[1][k])
+             for is in 2:s 
+                 DY=max(abs(U[is][k]-U_[is][k]),DY)
+             end 
+   
+             if DY>0
+                 diffU = true
+                 if DY< Dmin[k]
+                    Dmin[k]=DY
+                    iter=true
+                 end
+             end
+        end
+   
+        if (!iter && diffU && plusIt)
+             iter=true
+             plusIt=false
+        else
+             plusIt=true
+        end
+
+        if iter
+               
+            dt = dt_new
+            sdt = sdt_new
+
+            aux=zero(tT)
+            daux=zero(tT)
+            for is in 1:s
+                nf2+=1
+                kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj), 2)
+                aux = muladd(b[is],kf,aux)
+                daux = muladd(d[is],kf,daux)
+                K[is] = kf
+            end
+
+            j_iter += 1
+            diff_dt = (Dtau - dt*aux)/daux    
+            
+            if abs(diff_dt)<=eps(dt)
+                diff_dt = zero(tT)
+            end
+
+            dtaux_ = dtaux
+            dtaux = IRKGL_SEQ.Rdigits(dt + diff_dt, R)  
+                                    
+
+            if ((abs(dtaux-dtaux_)>0.5*max(dtaux,dtaux_)) && (step_number>1)) || (dtaux<=0) 
+
+                if dtaux<=0
+                     @warn "dtaux<=0 --> dtaux=dtaux_, n=$step_number, j=$j_iter,  dt_=$dtaux_, dt=$dtaux"
+                end
+                
+                @debug("n=$step_number, j=$j_iter, tj=$(Float32(tj)), dtaux_=$(Float32(dtaux_)), dtaux=$(Float32(dtaux)), dt_re=$(Float64((abs(dtaux-dtaux_)/max(dtaux,dtaux_))))")
+                
+                if initial_extrap && (step_number>1)
+        
+                    for is in 1:s  # Reinitialize V-stages
+                        for k in indices2
+                           U[is][k] = uj[k] + ej[k]
+                        end
+                    end
+        
+
+                    @. mu = sdt*a
+        
+                    for is in 1:s
+                        nf+=1
+                        kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj),1)
+                    end
+                
+                    for is in 1:s   # Reinitialize Q-stages
+                        for k in indices1
+                            dUik = ej[k]
+                            for js in 1:s
+                                dUik = muladd(mu[is,js], F[js][k], dUik)
+                            end
+                            U[is][k] =  uj[k] + dUik 
+                        end
+                    end
+            
+                    aux=zero(tT)
+                    for is in 1:s
+                       nf2+=1
+                       kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj), 2)
+                       aux = muladd(b[is],kf,aux)
+                    end
+        
+                    initial_extrap = false
+                    dtaux = IRKGL_SEQ.Rdigits(Dtau/aux,R)
+                    Dmin .= Inf
+                    diffU = true
+                    j_iter = 1
+        
+                else
+                    @warn "Convergence failure. Numerical integration interrupted. \n The value of dt=$Dtau appears to be too large. Please try again with a smaller value of dt"
+                    iter = false 
+                    step_retcode=false
+                end
+            end
+          
+            dt_new = min(dtaux, dtmax )
+            sdt_new = signdt*dt_new  
+            dsdt = sdt_new - sdt
+
+        end
+            
+    end # while
+   
+    dt = dt_new
+    sdt = sdt_new   
+
+    if (iter && (j_iter==maxiters) && step_retcode) 
+        @warn "Numerical integration interrupted. Reached maximum number of iterations (maxiters=$maxiters). \n The value of dt=$Dtau appears to be too large. Please try again with a smaller value of dt"
+        step_retcode=false
+    end 
+
+    #if (j_iter==1)
+    #    @warn "Numerical integration interrupted. \n The value of Dtau=$Dtau appears to be too small. Please try again with a greater value of dt"
+    #    step_retcode=false
+    #end
+   
+    if  step_retcode
+     
+           @inbounds if (j_iter<maxiters)  && diffU    
+
+                j_iter += 1
+           
+                for is in 1:s
+                   nf2+=1
+                   kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj), 2)
+                   K[is] = kf
+                end   
+            end   
+            
+            @. mu = sdt * a
+    
+            for is in 1:s
+                for k in indices2  
+                    dUik = ej[k]
+                    L[is][k] = sdt*(b[is]*F[is][k])
+                    for js in 1:s
+                        dUik = muladd(mu[is,js], F[js][k], dUik)
+                    end
+                    U[is][k] =  uj[k] + dUik
+                end
+            end   
+            
+            for is in 1:s
+                    nf+=1
+                    kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj), 1)
+                    for k in indices1
+                        L[is][k] = sdt*(b[is]*F[is][k])
+                    end
+            end
+ 
+            @inbounds for k in indices    #Equivalent to compensated summation
+   
+               L_sum = L[1][k]
+               for is in 2:s
+                   L_sum+=L[is][k]
+               end
+               res = Base.TwicePrecision(uj[k], ej[k]) + L_sum
+   
+               uj[k] = res.hi
+               ej[k] = res.lo
+   
+            end
+   
+            if dtaux >= dtmax
+                ttj[1] = tf
+                ttj[2] = 0
+            else
+                res = Base.TwicePrecision(tj, te) + sdt
+                ttj[1] = res.hi
+                ttj[2] = res.lo
+            end
+
+            @. mu = dt * a
+
+            for is in 1:s
+                    Tau_i = zero(tT)
+                    for js in 1:s
+                       Tau_i = muladd(mu[is,js], K[js], Tau_i)
+                    end
+                    Tau[is] =  Tau_i
+                    logK[is] = log(K[is])
+            end 
+
+            IRKGL_SEQ.PolInterp!(K, Kinv, Tau, logK, s, Tau_)  # Tau_ = (1+c)*Dtau
+            @. Kinv = exp(-K)
+
+            #if sum(Kinv)==Inf
+
+            #    @warn "Numerical integration interrupted. \n The value of dt=$Dtau appears to be too small. Please try again with a greater value of dt"
+            #    step_retcode=false
+    
+            #else
+
+            dtaux = zero(tT)
+            for js in 1:s
+                dtaux =muladd(b[js], Kinv[js], dtaux)
+            end
+
+            dtaux = IRKGL_SEQ.Rdigits(Dtau*dtaux,R)
+    
+            dts[1]=dtaux # A guess for next time-step
+            dts[2]=dt
+    
+            stats.nnonliniter+=j_iter
+            stats.nf+=nf
+            stats.nf2+=nf2
+                
+            #end
+
+    end
+   
+   return step_retcode
+   
 end
 
 
