@@ -10,7 +10,7 @@ Time-reversible or symplectic methods are very useful for long-term integration 
 
 Time-reversible or symplectic methods are very useful for long-term integration of planetary systems with a constant step size. The 16th order method implemented in our package SciML/IRKGaussLegendre.jl is both time-reversible and symplectic, and includes a SIMD-vectorized version IRKGL16-SIMD (presented in Juliacon2020) that is particularly efficient for problems without close encounters. However, numerical precision degrades greatly during close encounters if constant step size is employed. Close encounters are common, for instance, in simulations of the orbital evolution of the Solar System when some asteroids or comets are included in the model. Hence, a robust numerical integrator of few-body problems must include some adaptive mechanism to deal with close encounters. Unfortunately, with conventional time-step adaptivity strategies the advantages of symplectic methods is lost. 
 
-We present an integrator for few-body problems, which based on IRKGL16-SIMD, that incorporates a robust time-reversible adaptivity mechanism that makes it highly performant for the long-term numerical integration of problems with close-encounters. Fortunately, time-stepping strategies that preserve the reversible structure of the n-body problem are possible, for instance, by applying reversible stepsize strategies introduced in [2], which require an explicitly given expression of the stepsize as a function of the positions and velocities. In our code, we make use of an appropriate step-size function for the n-problem proposed in our previous work [1].
+We present an integrator for few-body problems, which based on IRKGL16-SIMD, that incorporates a robust time-reversible adaptivity mechanism that makes it highly performant for the long-term numerical integration of problems with close-encounters. Fortunately, time-stepping strategies that preserve the reversible structure of the n-body problem are possible, for instance, by applying reversible stepsize strategies introduced in [1], which require an explicitly given expression of the stepsize as a function of the positions and velocities. In our code, we make use of an appropriate step-size function for the n-problem proposed in our previous work [2,3].
 
 We show some numerical experiments with few-body problems that demonstrates the efficiency and robustness of our code.
 
@@ -18,11 +18,16 @@ We show some numerical experiments with few-body problems that demonstrates the 
 ## References
 
 
-- [1] Global Time-Renormalization of the Gravitational N-body Problem, M. Antoñana, P. Chartier, J. Makazaga and A. Murua. SIAM Journal on Applied Dynamical System (2020). https://doi.org/10.1137/20M1314719.
-
-- [2] Reversible Long-Term Integration with Variable Stepsizes,  E.Hairer and  D. Stoffer.
+- [1] Reversible Long-Term Integration with Variable Stepsizes,  E.Hairer and  D. Stoffer.
 SIAM Journal on Scientific Computing (1997).
 https://doi.org/10.1137/S1064827595285494
+
+- [2] Global Time-Renormalization of the Gravitational N-body Problem, M. Antoñana, P. Chartier, J. Makazaga and A. Murua. SIAM Journal on Applied Dynamical System (2020). https://doi.org/10.1137/20M1314719.
+
+- [3] Majorant series for the N-body problem,   M. Antoñana, P. Chartier and A. Murua.
+Iternational Journal of Computer Mathematics (2021).
+https://doi.org/10.1080/00207160.2021.1962848
+
 
 ## Repository
 
