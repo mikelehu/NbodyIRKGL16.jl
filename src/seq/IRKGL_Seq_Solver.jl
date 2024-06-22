@@ -25,23 +25,24 @@ struct IRKGL_Cache{uT,tT,fT,pT}
     step_number::Array{Int64,0}
     initial_extrap::Bool
     length_u::Int64
+    length_q::Int64
     tf::tT
     Dtau::tT
 end
 
 
 
-abstract type IRKAlgorithm{s, initial_extrapolation, mstep} <: OrdinaryDiffEqAlgorithm end
-struct IRKGL_seq{s, initial_extrapolation, mstep} <: IRKAlgorithm{s, initial_extrapolation, mstep} end
-IRKGL_seq(;s=8, initial_extrapolation=true, mstep=1)=IRKGL_seq{s, initial_extrapolation, mstep}()
+abstract type IRKAlgorithm{s, initial_extrapolation, ode2nd, mstep} <: OrdinaryDiffEqAlgorithm end
+struct fbirkgl16{s, initial_extrapolation, ode2nd, mstep} <: IRKAlgorithm{s, initial_extrapolation, ode2nd, mstep} end
+fbirkgl16(;s=8, initial_extrapolation=true, ode2nd=true, mstep=1)=fbirkgl16{s, initial_extrapolation, ode2nd, mstep}()
 
 function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,isinplace},
-    alg::IRKGL_seq{s,initial_extrapolation, mstep}, args...;
+    alg::fbirkgl16{s,initial_extrapolation, ode2nd, mstep}, args...;
     dt=zero(eltype(tspanType)),
     save_on=true,
     adaptive=true,
     maxiters=100,
-    kwargs...) where {uType,tspanType,isinplace,s,initial_extrapolation,mstep}
+    kwargs...) where {uType,tspanType,isinplace,s,initial_extrapolation,ode2nd,mstep}
 
 
     checks=true
@@ -54,6 +55,25 @@ function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,
     @unpack f,u0,tspan,p,kwargs=prob
     f= SciMLBase.unwrapped_f(prob.f) 
 
+
+    step_fun::Function=empty
+    if ode2nd
+        if adaptive
+            step_fun=Main.IRKNGLstep_adap!
+        else
+            step_fun=Main.IRKNGLstep_fixed!
+        end
+
+    else
+        if adaptive
+            step_fun=Main.IRKGLstep_adap!
+        else
+            step_fun=Main.IRKGLstep_fixed!
+        end
+
+    end
+
+    
     uiType=eltype(uType)
     if uiType <:Complex 
         uiType=real(uiType)
@@ -76,6 +96,7 @@ function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,
     Tau_ = (1 .+ c)*Dtau
     alpha=similar(theta)
     length_u = length(u0)
+    length_q=div(length_u,2)
 
     U=Array{uType}(undef, s)
     for i in 1:s
@@ -100,7 +121,7 @@ function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,
                               K,logK,Kinv,Tau,Tau_,
                               U, U_, L, 
                               F,Dmin,maxiters,step_number,
-                              init_extrap,length_u,tf,Dtau)
+                              init_extrap,length_u, length_q, tf,Dtau)
 #
 
     uu = uType[]
@@ -123,20 +144,18 @@ function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,
 
         cont=true
         error_warn=0
+
         if !adaptive dt=min(dt,abs(tf-t0)) end
         dts=[dt,dtprev,signdt] 
 
-        if adaptive
+        if adaptive dts[1] = zero(tType) end
 
-            dts[1] = zero(tType)
-
-        
-            while cont
+        while cont
 
                 for i in 1:mstep 
 
                     step_number[]+= 1
-                    step_retcode = Main.IRKGLstep_adap!(tj,uj,ej,dts,stats,irkgl_cache)
+                    step_retcode = step_fun(tj,uj,ej,dts,stats,irkgl_cache)
 
                     if !step_retcode
                         error_warn=1
@@ -155,40 +174,8 @@ function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,
                     push!(tt,tj[1])
                 end
 
-            end 
+        end 
         
-        else
-
-            while cont
-
-                for i in 1:mstep 
-
-                    step_number[]+= 1
-                    step_retcode=Main.IRKGLstep_fixed!(tj,uj,ej,dts,stats,irkgl_cache)
-
-                    if !step_retcode
-                        error_warn=1
-                        cont = false
-                    end
-                    
-                    if (tj[1]==tf)  
-                        cont=false  
-                        break
-                    end
-
-                end
-
-                if save_on
-                    push!(uu,copy(uj))
-                    push!(tt,tj[1])
-                end
-
-
-
-            end 
-
-        end
-
         stats.naccept=step_number[]
         if error_warn!=0
             @warn("Error during the integration warn=$error_warn")

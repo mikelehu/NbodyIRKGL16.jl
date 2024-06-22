@@ -5,27 +5,54 @@
 ## Description
 
 
-We present an integrator for few-body problems, which based on IRKGL16-SIMD, that incorporates a robust time-reversible adaptivity mechanism that makes it highly performant for the long-term numerical integration of problems with close-encounters. 
+We present an integrator for few-body problems, which based on IRKGL16, that incorporates a robust time-reversible adaptivity mechanism that makes it highly performant for the long-term numerical integration of problems with close-encounters. 
 
 
 
 ## Installation
 
+The package is still unregistered, use the next command to install it:
+
 ```julia
-PATH_SRC_SIMD="../../src/simd/"
-include(string(PATH_SRC_SIMD,"IRKGL_SIMD.jl"))
-using .IRKGL_SIMD   
+julia> Pkg.clone("git://github.com/mikelehu/NbodyIRKGL16.jl.git")  
 ```
+
+These are the project dependencies that also need to be installed:
+
+```julia
+julia> dependencies=["DiffEqBase","Parameters", "OrdinaryDiffEq", "SIMD"]
+julia> Pkg.add(dependencies)  
+```
+
+
+After the package is installed, it can be loaded into the Julia session:
+
+```julia
+julia> using NbodyIRKGL16 
+```
+
+After defining a problem, a code example to solve this problem is: 
+
+```julia
+julia> sol=solve(prob, fbirkgl16_simd(), adaptive=true, dt = Dtau)
+```
+
 
 ## Solver options
 
+### Available solvers
+
+
+- **fbirkgl16_simd**: vectorized implementation only for Float32 and Float64 computations
+
+- **fbirkgl16_gen**: generic implementation that can use arbitrary Julia-defined number systems 
 
 ### Available common arguments
 
 
 - dt:
-    - if adaptive=false, dt is the stepsize for the integration
     - if adaptive=true, dt is a constant to specify the tolerance (Dtau=dt)
+    - if adaptive=false, dt is the stepsize for the integration
 
 - save_on: denotes whether intermediate solutions are saved (default is true)
 - adaptive =true (adaptive timestepping); =false (fixed timestepping)
@@ -36,12 +63,15 @@ using .IRKGL_SIMD
 
 
 - initial_extrapolation: initialization method for stages:
+    - =true (default) interpolating from the stage values of previous step
+    - =false  simplest initialization
 
-        - =false  simplest initialization
-        - =true (default) interpolating from the stage values of previous step
 
 - mstep: output saved at every 'mstep' steps (default mstep=1)
 
+- ode2nd: 
+    - =true (default) to integrate a second order differential equation 
+    - = false in other case
 
 
 ## Return Codes
@@ -53,6 +83,7 @@ The solution types have a retcode field which returns a symbol signifying the er
 
 
 ## Example: 15-body model of the Solar System
+Jupyter notebook :  "/Examples/15-body Solar System integration.ipynb"
 
 
 We consider the 15-body model of the Solar Systen that includes: the Sun, all eight planets of the Solar System, Pluto and the five main bodies of the asteroid belt.
@@ -61,7 +92,6 @@ We consider the initial values at Julian day (TDB) 2440400.5 (the 28th of June o
 
 We run a numerical integration back in time for $t=2e7$ days where a close approach between Ceres and Bamberga asteroids occurs.
 
-Jupyter notebook :  "/Examples/15-body Solar System integration.ipynb"
 
 ### Step 1: Defining  the problem
 
@@ -69,17 +99,12 @@ To solve this numerically, we define a problem type by giving it the equation, t
 condition, and the timespan to solve over:
 
 ```julia
-using .IRKGL_SIMD
+using NbodyIRKGL16 
 using Plots, LinearAlgebra
-
-PATH_ODES="../../ODEProblems/"
-include(string(PATH_ODES,"Initial15Body.jl"))
-include(string(PATH_ODES,"Nbody.jl"));
 ```
 
 
 ```julia
-
 fltype=Float64
 u0, Gm, bodylist = Initial15Body(fltype)  # defined in "Initial15Body.jl" file.
 N = length(Gm)
@@ -91,7 +116,6 @@ tspan= (t0,tF)
 
 # NbodyODE_fstep!() is defined in "Nbody.jl" file.
 prob = ODEProblem(NbodyODE_fstep!, u0,tspan , Gm);
-
 ```
 
 ### Step 2: Solving the problem
@@ -101,8 +125,7 @@ After defining a problem, you solve it using solve
 
 ```julia
 Dtau=fltype(1.8)
-alg= IRKNGL_simd(initial_extrapolation=true)
-sol=solve(prob, alg, adaptive=true, dt = Dtau)
+sol=solve(prob, fbirkgl16_simd(), adaptive=true, dt = Dtau)
 sol.retcode
 ```
 
@@ -143,7 +166,7 @@ for j = 11:15
         label="")
 end 
 
-
+src
 plot(pl1,pl2,pl3, layout=(1,3), size=(1200,300))
 ```
 ![15-body Solar System](/Examples/BodyOrbits.png)

@@ -26,22 +26,23 @@ struct IRKGL_SIMD_Cache{floatT,fType,pType,s_,dim_}
     step_number::Array{Int64,0}
     initial_extrap::Bool
     length_u::Int64
+    length_q::Int64
     tf::floatT
     Dtau::floatT
 end
 
 
-abstract type IRKAlgorithm{s, initial_extrapolation, mstep, floatType} <: OrdinaryDiffEqAlgorithm end
-struct IRKGL_simd{s, initial_extrapolation, mstep, floatType} <: IRKAlgorithm{s, initial_extrapolation, mstep, floatType} end
-IRKGL_simd(;s=8, initial_extrapolation=true, mstep=1, floatType=Float64)=IRKGL_simd{s, initial_extrapolation, mstep, floatType}()
+abstract type IRKAlgorithm_{s, initial_extrapolation,  ode2nd, mstep, floatType} <: OrdinaryDiffEqAlgorithm end
+struct fbirkgl16_simd{s, initial_extrapolation,  ode2nd, mstep, floatType} <: IRKAlgorithm_{s, initial_extrapolation,  ode2nd, mstep, floatType} end
+fbirkgl16_simd(;s=8, initial_extrapolation=true,  ode2nd=true ,mstep=1, floatType=Float64)=fbirkgl16_simd{s, initial_extrapolation,  ode2nd, mstep, floatType}()
 
 function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,isinplace},
-    alg::IRKGL_simd{s, initial_extrapolation, mstep, floatType}, args...;
+    alg::fbirkgl16_simd{s, initial_extrapolation,  ode2nd, mstep, floatType}, args...;
     dt=zero(eltype(tspanType)),
     save_on=true,
     adaptive=true,
     maxiters=100,
-    kwargs...) where {floatType<: Union{Float32,Float64},uType,tspanType,isinplace,s,initial_extrapolation, mstep}
+    kwargs...) where {floatType<: Union{Float32,Float64},uType,tspanType,isinplace,s,initial_extrapolation,  ode2nd, mstep}
 
     checks=true
 
@@ -52,6 +53,23 @@ function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,
 
     @unpack f,u0,tspan,p,kwargs=prob
     f= SciMLBase.unwrapped_f(prob.f) 
+
+    step_fun::Function=empty
+    if ode2nd
+        if adaptive
+            step_fun=Main.Main.IRKNGLstep_SIMD_adap!
+        else
+            step_fun=Main.Main.IRKNGLstep_SIMD_fixed!
+        end
+
+    else
+        if adaptive
+            step_fun=Main.IRKGLstep_SIMD_adap!
+        else
+            step_fun=Main.IRKGLstep_SIMD_fixed!
+        end
+
+    end
 
     tType=eltype(tspanType)
     uiType=eltype(uType)
@@ -66,6 +84,7 @@ function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,
     (b_, c_, a_, mu_, nu_, theta_, omega_, d_) = IRKGLCoefficients(tType,s)
 
     length_u = length(u0)
+    length_q=div(length_u,2)
     dims = size(u0)
 
     b = vload(Vec{s,floatType}, b_, 1)
@@ -103,7 +122,7 @@ function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,
                                    K,logK, Kinv, Tau, Tau_,
                                    U, U_, L, 
                                    F,Dmin,maxiters,step_number,
-                                   init_extrap,length_u,tf,Dtau)
+                                   init_extrap,length_u, length_q, tf,Dtau)
 
 
     uu = uType[]
@@ -129,65 +148,35 @@ function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,
        if !adaptive dt=min(dt,abs(tf-t0)) end
        dts=[dt,dtprev,signdt] 
 
-       if adaptive
+       if adaptive dts[1] = zero(tType) end
 
-            dts[1] = zero(tType)
+       while cont
 
-            while cont
+            for i in 1:mstep 
 
-                for i in 1:mstep 
+                step_number[] += 1
+#                step_retcode= Main.IRKGLstep_SIMD_adap!(tj,uj,ej,dts,stats,irkgl_cache)
+                step_retcode= step_fun(tj,uj,ej,dts,stats,irkgl_cache)
 
-                    step_number[] += 1
-                    step_retcode= Main.IRKGLstep_SIMD_adap!(tj,uj,ej,dts,stats,irkgl_cache)
-
-                    if !step_retcode
-                        error_warn=1
-                        cont = false
-                    end
+                if !step_retcode
+                    error_warn=1
+                    cont = false
+                end
  
-                    if (tj[1]==tf)  
-                        cont=false  
-                        break
-                    end
+                if (tj[1]==tf)  
+                    cont=false  
+                    break
+                end
         
-                end
+            end
 
-                if save_on
-                    push!(uu,copy(uj))
-                    push!(tt,tj[1])
-                end
+            if save_on
+                push!(uu,copy(uj))
+                push!(tt,tj[1])
+            end
 
-            end 
+        end 
 
-       else
-
-            while cont
-
-                for i in 1:mstep 
-
-                    step_number[] += 1
-                    step_retcode= Main.IRKGLstep_SIMD_fixed!(tj,uj,ej,dts,stats,irkgl_cache)
-
-                    if !step_retcode
-                        error_warn=1
-                        cont = false
-                    end
- 
-                    if (tj[1]==tf)  
-                        cont=false  
-                        break
-                    end
-        
-                end
-
-                if save_on
-                    push!(uu,copy(uj))
-                    push!(tt,tj[1])
-                end
-
-            end 
-
-        end
 
         stats.naccept=step_number[]
         

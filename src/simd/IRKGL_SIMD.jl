@@ -9,7 +9,7 @@ using Parameters
 using OrdinaryDiffEq
 using SIMD
 
-export  IRKGL_simd, IRKNGL_simd
+export  fbirkgl16_simd
 export IRKGLstep_SIMD_fixed!, IRKGLstep_SIMD_adap!
 export IRKNGLstep_SIMD_fixed!, IRKNGLstep_SIMD_adap!
 export PolInterp, PolInterp!
@@ -22,7 +22,6 @@ include("../common/aux_functions.jl")
 include("../common/aux_functions_SIMD.jl")
 include("IRKGL_SIMD_Solver.jl")
 include("IRKGL_SIMD_Step_Functions.jl")
-include("IRKNGL_SIMD_Solver.jl")
 include("IRKNGL_SIMD_Step_Functions.jl")
 
 

@@ -3,28 +3,28 @@
 #  IRKNGLstep_adap!
 
 
-function IRKNGLstep_fixed!(ttj, uj,ej, dts, stats, irkngl_cache::IRKGL_SEQ.IRKNGL_Cache{uT,tT,fT,pT}) where {uT,tT,fT,pT}
+function IRKNGLstep_fixed!(ttj, uj,ej, dts, stats, irkgl_cache::IRKGL_SEQ.IRKGL_Cache{uT,tT,fT,pT}) where {uT,tT,fT,pT}
 
  
-    f = irkngl_cache.odef
-    p = irkngl_cache.p
-    b = irkngl_cache.b
-    c = irkngl_cache.c
-    mu = irkngl_cache.mu
-    nu = irkngl_cache.nu
-    U = irkngl_cache.U
-    U_ = irkngl_cache.U_
-    L = irkngl_cache.L
-    F = irkngl_cache.F
-    Dmin = irkngl_cache.Dmin
-    step_number = irkngl_cache.step_number[]
-    initial_extrap = irkngl_cache.initial_extrap[]
+    f = irkgl_cache.odef
+    p = irkgl_cache.p
+    b = irkgl_cache.b
+    c = irkgl_cache.c
+    mu = irkgl_cache.mu
+    nu = irkgl_cache.nu
+    U = irkgl_cache.U
+    U_ = irkgl_cache.U_
+    L = irkgl_cache.L
+    F = irkgl_cache.F
+    Dmin = irkgl_cache.Dmin
+    step_number = irkgl_cache.step_number[]
+    initial_extrap = irkgl_cache.initial_extrap[]
     len = length(uj)
-    lenq = irkngl_cache.length_q
-    tf = irkngl_cache.tf
+    lenq = irkgl_cache.length_q
+    tf = irkgl_cache.tf
 
     s = length(b)
-    maxiters = (step_number==1 ? 10+irkngl_cache.maxiters : irkngl_cache.maxiters )
+    maxiters = (step_number==1 ? 10+irkgl_cache.maxiters : irkgl_cache.maxiters )
     tj = ttj[1]
     te = ttj[2] 
 
@@ -242,42 +242,42 @@ function IRKNGLstep_fixed!(ttj, uj,ej, dts, stats, irkngl_cache::IRKGL_SEQ.IRKNG
 
 end
 
-function IRKNGLstep_adap!(ttj, uj,ej, dts, stats, irkngl_cache::IRKGL_SEQ.IRKNGL_Cache{uT,tT,fT,pT}) where {uT,tT,fT,pT}
+function IRKNGLstep_adap!(ttj, uj,ej, dts, stats, irkgl_cache::IRKGL_SEQ.IRKGL_Cache{uT,tT,fT,pT}) where {uT,tT,fT,pT}
 
  
-    f = irkngl_cache.odef
-    p = irkngl_cache.p
-    b = irkngl_cache.b
-    c = irkngl_cache.c
-    d = irkngl_cache.d
-    a = irkngl_cache.a
-    mu = irkngl_cache.mu
-    nu = irkngl_cache.nu
-    theta=irkngl_cache.theta
-    omega=irkngl_cache.omega
-    alpha=irkngl_cache.alpha
-    K = irkngl_cache.K
-    logK = irkngl_cache.logK
-    Kinv=irkngl_cache.Kinv
-    Tau = irkngl_cache.Tau
-    Tau_ = irkngl_cache.Tau_
-    U = irkngl_cache.U
-    U_ = irkngl_cache.U_
-    L = irkngl_cache.L
-    F = irkngl_cache.F
-    Dmin = irkngl_cache.Dmin
-    step_number = irkngl_cache.step_number[]
-    initial_extrap = irkngl_cache.initial_extrap[]
+    f = irkgl_cache.odef
+    p = irkgl_cache.p
+    b = irkgl_cache.b
+    c = irkgl_cache.c
+    d = irkgl_cache.d
+    a = irkgl_cache.a
+    mu = irkgl_cache.mu
+    nu = irkgl_cache.nu
+    theta=irkgl_cache.theta
+    omega=irkgl_cache.omega
+    alpha=irkgl_cache.alpha
+    K = irkgl_cache.K
+    logK = irkgl_cache.logK
+    Kinv=irkgl_cache.Kinv
+    Tau = irkgl_cache.Tau
+    Tau_ = irkgl_cache.Tau_
+    U = irkgl_cache.U
+    U_ = irkgl_cache.U_
+    L = irkgl_cache.L
+    F = irkgl_cache.F
+    Dmin = irkgl_cache.Dmin
+    step_number = irkgl_cache.step_number[]
+    initial_extrap = irkgl_cache.initial_extrap[]
     len = length(uj)
-    lenq = irkngl_cache.length_q
-    tf = irkngl_cache.tf
-    Dtau=irkngl_cache.Dtau
+    lenq = irkgl_cache.length_q
+    tf = irkgl_cache.tf
+    Dtau=irkgl_cache.Dtau
 
     R=tT(2)^10 
    
     s = length(b)
     extra_iters = (step_number>1 && initial_extrap ? 1 : 9)
-    maxiters = irkngl_cache.maxiters + extra_iters - 1
+    maxiters = irkgl_cache.maxiters + extra_iters - 1
     tj = ttj[1]
     te = ttj[2]
     dtmax = abs((tf-tj)-te)  
