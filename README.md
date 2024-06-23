@@ -14,6 +14,7 @@ We present an integrator for few-body problems, which based on IRKGL16, that inc
 The package is still unregistered, use the next command to install it:
 
 ```julia
+julia> using Pkg
 julia> Pkg.add(url="https://github.com/mikelehu/NbodyIRKGL16.jl")  
 ```
 
