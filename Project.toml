@@ -1,0 +1,21 @@
+name = "NbodyIRKGL16"
+uuid = "dd339487-2461-4248-bfe4-17406042bc3b"
+authors = ["mikel <mikel.antonana@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
+Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
+Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
+SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
+
+
+[compat]
+DiffEqBase = "6.144"
+OrdinaryDiffEq = "6"
+Parameters = "0.12"
+Reexport = "1.0"
+SciMLBase = "2"
+julia = "1.9"
