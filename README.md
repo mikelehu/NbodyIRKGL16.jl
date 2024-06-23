@@ -14,13 +14,13 @@ We present an integrator for few-body problems, which based on IRKGL16, that inc
 The package is still unregistered, use the next command to install it:
 
 ```julia
-julia> Pkg.clone("git://github.com/mikelehu/NbodyIRKGL16.jl.git")  
+julia> Pkg.add(url="https://github.com/mikelehu/NbodyIRKGL16.jl")  
 ```
 
 These are the project dependencies that also need to be installed:
 
 ```julia
-julia> dependencies=["DiffEqBase","Parameters", "OrdinaryDiffEq", "SIMD"]
+julia> dependencies=["DiffEqBase", "Parameters", "OrdinaryDiffEq", "SciMLBase", "Reexport", "SIMD"]
 julia> Pkg.add(dependencies)  
 ```
 
