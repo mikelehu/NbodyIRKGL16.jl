@@ -9,7 +9,7 @@ using Parameters
 using OrdinaryDiffEq
 using SIMD
 
-export fbirkgl16_gen, fbirkgl16_simd
+export nbirkgl16_gen, nbirkgl16_simd
 export IRKGLstep_fixed!, IRKGLstep_adap!
 export IRKNGLstep_fixed!, IRKNGLstep_adap!
 export IRKGLstep_SIMD_fixed!, IRKGLstep_SIMD_adap!

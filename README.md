@@ -1,6 +1,7 @@
 # NbodyIRKGL16.jl :  **few-body integrator with time-reversible adaptivity in Julia**
 
-
+# Ctr+K V
+#
 
 ## Description
 
@@ -35,7 +36,7 @@ using NbodyIRKGL16
 After defining a problem, a code example to solve this problem is: 
 
 ```julia
-sol=solve(prob, fbirkgl16_simd(), adaptive=true, dt = Dtau)
+sol=solve(prob, nbirkgl16_simd(), adaptive=true, dt = Dtau)
 ```
 
 
@@ -44,9 +45,9 @@ sol=solve(prob, fbirkgl16_simd(), adaptive=true, dt = Dtau)
 ### Available solvers
 
 
-- **fbirkgl16_simd**: vectorized implementation only for Float32 and Float64 computations
+- **nbirkgl16_simd**: vectorized implementation only for Float32 and Float64 computations
 
-- **fbirkgl16_gen**: generic implementation that can use arbitrary Julia-defined number systems 
+- **nbirkgl16_gen**: generic implementation that can use arbitrary Julia-defined number systems 
 
 ### Available common arguments
 
@@ -126,7 +127,7 @@ After defining a problem, you solve it using solve
 
 ```julia
 Dtau=fltype(1.8)
-sol=solve(prob, fbirkgl16_simd(), adaptive=true, dt = Dtau)
+sol=solve(prob, nbirkgl16_simd(), adaptive=true, dt = Dtau)
 sol.retcode
 ```
 
@@ -170,7 +171,7 @@ end
 src
 plot(pl1,pl2,pl3, layout=(1,3), size=(1200,300))
 ```
-![15-body Solar System](/Examples/BodyOrbits.png)
+![15-body Solar System](/Examples/Figures/BodyOrbits.png)
 
 
 
@@ -197,7 +198,7 @@ pl1=plot(title="Error in Energy", xlabel="t", ylabel="log10(ΔE/E0)",
 plot!(pl1,sol.t[2:end-1],abs.(ΔE[2:end-1]), color=:red, label="")
 ```
 
-![Error in energy](/Examples/EnergyError.png)
+![Error in energy](/Examples/Figures/EnergyError.png)
 
 
 #### Close encounters between asteroids
@@ -260,7 +261,7 @@ plot(pl1,pl2, layout=(1,2), size=(900,300))
 ```
 
 
-![Close encounter](/Examples/CloseEncounter.png)
+![Close encounter](/Examples/Figures/CloseEncounter.png)
 
 
 ## References

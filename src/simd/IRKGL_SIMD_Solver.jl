@@ -33,11 +33,11 @@ end
 
 
 abstract type IRKAlgorithm_{s, initial_extrapolation,  ode2nd, mstep, floatType} <: OrdinaryDiffEqAlgorithm end
-struct fbirkgl16_simd{s, initial_extrapolation,  ode2nd, mstep, floatType} <: IRKAlgorithm_{s, initial_extrapolation,  ode2nd, mstep, floatType} end
-fbirkgl16_simd(;s=8, initial_extrapolation=true,  ode2nd=true ,mstep=1, floatType=Float64)=fbirkgl16_simd{s, initial_extrapolation,  ode2nd, mstep, floatType}()
+struct nbirkgl16_simd{s, initial_extrapolation,  ode2nd, mstep, floatType} <: IRKAlgorithm_{s, initial_extrapolation,  ode2nd, mstep, floatType} end
+nbirkgl16_simd(;s=8, initial_extrapolation=true,  ode2nd=true ,mstep=1, floatType=Float64)=nbirkgl16_simd{s, initial_extrapolation,  ode2nd, mstep, floatType}()
 
 function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,isinplace},
-    alg::fbirkgl16_simd{s, initial_extrapolation,  ode2nd, mstep, floatType}, args...;
+    alg::nbirkgl16_simd{s, initial_extrapolation,  ode2nd, mstep, floatType}, args...;
     dt=zero(eltype(tspanType)),
     save_on=true,
     adaptive=true,
