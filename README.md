@@ -1,7 +1,6 @@
 # NbodyIRKGL16.jl :  **few-body integrator with time-reversible adaptivity in Julia**
 
-# Ctr+K V
-#
+
 
 ## Description
 
