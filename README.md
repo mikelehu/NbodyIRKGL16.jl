@@ -5,13 +5,13 @@
 ## Description
 
 
-We present an integrator for few-body problems, which based on IRKGL16, that incorporates a robust time-reversible adaptivity mechanism that makes it highly performant for the long-term numerical integration of problems with close-encounters. 
+We present an integrator for few-body problems  based on [IRKGL16](https://github.com/SciML/IRKGaussLegendre.jl), which incorporates a robust time-reversible adaptivity mechanism that makes it highly performant for the long-term numerical integration of problems with close-encounters. 
 
 
 
 ## Installation
 
-The package is still unregistered, use the next command to install it:
+The package is still unregistered. Use the following command to install it:
 
 ```julia
 using Pkg
@@ -32,30 +32,39 @@ After the package is installed, it can be loaded into the Julia session:
 using NbodyIRKGL16 
 ```
 
-After defining a problem, a code example to solve this problem is: 
+The implementation is designed to handle the integration of N-body problems,
+
+<div style="text-align: center;">
+<img src="./images/NbodyEq.png" alt="Equation" width="250">
+</div>
+
+The definition of the N-body problem that returns the step-size expression is defined 
+in [NbodyODE_with_step_size!](./ODEProblems/Nbody.jl) function. 
+So, you must define the problem as follows:
 
 ```julia
-sol=solve(prob, nbirkgl16_simd(), adaptive=true, dt = Dtau)
+prob = ODEProblem(NbodyODE_with_step_size!, u0, tspan , Gm)
+```
+
+After defining a problem, a code example to solve it is: 
+
+```julia
+sol=solve(prob, nbirkgl16(), adaptive=true, dt = Dtau)
 ```
 
 
 ## Solver options
 
-### Available solvers
 
-
-- **nbirkgl16_simd**: vectorized implementation only for Float32 and Float64 computations
-
-- **nbirkgl16_gen**: generic implementation that can use arbitrary Julia-defined number systems 
 
 ### Available common arguments
 
 
 - dt:
-    - if adaptive=true, dt is a constant to specify the tolerance (Dtau=dt)
-    - if adaptive=false, dt is the stepsize for the integration
+    - if adaptive=true, dt is a constant and specifies the tolerance (Dtau=dt)
+    - if adaptive=false, dt is the step size for the integration
 
-- save_on: denotes whether intermediate solutions are saved (default is true)
+- save_on: specifies whether intermediate solutions are saved (default is true)
 - adaptive =true (adaptive timestepping); =false (fixed timestepping)
 - maxiters: maximum number of iterations before stopping
 
@@ -64,15 +73,19 @@ sol=solve(prob, nbirkgl16_simd(), adaptive=true, dt = Dtau)
 
 
 - initial_extrapolation: initialization method for stages:
-    - =true (default) interpolating from the stage values of previous step
-    - =false  simplest initialization
+    - =true (default): interpolates from the stage values of previous step
+    - =false:  uses the simplest initialization
 
 
 - mstep: output saved at every 'mstep' steps (default mstep=1)
 
-- ode2nd: 
-    - =true (default) to integrate a second order differential equation 
-    - = false in other case
+- second_order_ode: 
+    - =true (default): integrates a second-order differential equation 
+    - = false: for other case
+
+- simd (boolean):
+    - =true (default): vectorized implementation only for Float32 and Float64 computations
+    - =false: generic implementation that can use arbitrary Julia-defined number systems 
 
 
 ## Return Codes
@@ -96,7 +109,7 @@ We run a numerical integration back in time for $t=2e7$ days where a close appro
 
 ### Step 1: Defining  the problem
 
-To solve this numerically, we define a problem type by giving it the equation, the initial
+To solve this numerically, define a problem type by specifying the equation, initial
 condition, and the timespan to solve over:
 
 ```julia
@@ -115,18 +128,18 @@ t0=fltype(0.)
 tF=fltype(-2e4)  
 tspan= (t0,tF)
 
-# NbodyODE_fstep!() is defined in "Nbody.jl" file.
-prob = ODEProblem(NbodyODE_fstep!, u0,tspan , Gm);
+# NbodyODE_with_step_size!() is defined in "Nbody.jl" file.
+prob = ODEProblem(NbodyODE_with_step_size!, u0,tspan , Gm);
 ```
 
 ### Step 2: Solving the problem
 
 
-After defining a problem, you solve it using solve
+After defining the problem, you solve it using solve
 
 ```julia
 Dtau=fltype(1.8)
-sol=solve(prob, nbirkgl16_simd(), adaptive=true, dt = Dtau)
+sol=solve(prob, nbirkgl16(), adaptive=true, dt = Dtau)
 sol.retcode
 ```
 
@@ -263,6 +276,22 @@ plot(pl1,pl2, layout=(1,2), size=(900,300))
 ![Close encounter](/Examples/Figures/CloseEncounter.png)
 
 
+## Algorithm details
+
+- Time-reversible adaptive NBIRKGL16 algorithm:
+
+
+  <div style="text-align: center;">
+  <img src="./images/algorithm.png" alt="Algorithm" width="350">
+  </div>
+
+
+- We apply $K(u)$ proposed for n-body problem in [1,2],
+
+  <div style="text-align: center;">
+  <img src="./images/Step_size_fun.png" alt="Step size function" width="550">
+  </div>
+
 ## References
 
 - [1] Reversible Long-Term Integration with Variable Stepsizes,  E.Hairer and  D. Stoffer.
@@ -280,5 +309,6 @@ https://doi.org/10.1080/00207160.2021.1962848
 -https://github.com/mikelehu/NbodyIRKGL16.jl
 
 
+## Contact
 
-
+If you have any questions or suggestions, feel free to open an issue or contact us at mikel.antonana@ehu.eus.
