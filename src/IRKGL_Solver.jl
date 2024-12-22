@@ -64,14 +64,14 @@ struct IRKGL_SIMD_Cache{floatT,fType,pType,s_,dim_}
 end
 
 
-abstract type IRKAlgorithm{s, initial_extrapolation, second_order_ode, mstep, simd, floatType} <: OrdinaryDiffEqAlgorithm end
+abstract type IRKAlgorithm{s, initial_extrapolation, second_order_ode, mstep, simd, floatType} <: OrdinaryDiffEq.OrdinaryDiffEqAlgorithm end
 struct nbirkgl16{s, initial_extrapolation, second_order_ode, mstep, simd, floatType} <: IRKAlgorithm{s, initial_extrapolation, second_order_ode, mstep, simd, floatType} end
 nbirkgl16(;s=8, initial_extrapolation=true, second_order_ode=true, mstep=1, simd=true, floatType=Float64)=nbirkgl16{s, initial_extrapolation, second_order_ode, mstep, simd,floatType}()
 
 function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,isinplace},
     alg::nbirkgl16{s,initial_extrapolation, second_order_ode, mstep, simd, floatType}, args...;
     dt=zero(eltype(tspanType)),
-    save_on=true,
+    save_everystep=true,
     adaptive=true,
     maxiters=100,
     kwargs...) where {floatType<:Number, uType,tspanType,isinplace,s,initial_extrapolation,second_order_ode,mstep, simd}
@@ -81,7 +81,7 @@ function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,
 
     stats = DiffEqBase.Stats(0)
     stats.nf=0
-    stats.nnonliniter=0
+    stats.nfpiter=0
     stats.naccept=0
     
     @unpack f,u0,tspan,p,kwargs=prob
@@ -268,7 +268,7 @@ function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,
 
                 end
 
-                if save_on
+                if save_everystep
                     push!(uu,copy(uj))
                     push!(tt,tj[1])
                 end
@@ -283,7 +283,7 @@ function DiffEqBase.__solve(prob::DiffEqBase.AbstractODEProblem{uType,tspanType,
         
         else
 
-            if !save_on
+            if !save_everystep
                 push!(uu,copy(uj))
                 push!(tt,tj[1])
             end

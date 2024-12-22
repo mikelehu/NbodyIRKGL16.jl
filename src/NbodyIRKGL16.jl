@@ -4,9 +4,9 @@ module NbodyIRKGL16
 
 using Reexport
 @reexport using DiffEqBase
+@reexport using OrdinaryDiffEq
 
 using Parameters
-using OrdinaryDiffEq
 using SIMD
 
 export nbirkgl16

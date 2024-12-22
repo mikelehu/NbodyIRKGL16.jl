@@ -30,14 +30,15 @@ end
 end
 
 
-@inline function getindex_(v::VecArray{s,T,dim},k::Int64) where {s,T,dim}
+
+@inline function getindex(v::VecArray{s,T,dim},k::Int64) where {s,T,dim}
     j = s*(k-1)
     Vec{s,T}(NTuple{s,T}(@inbounds v.data[is+j] for is=1:s))
 
 end
 
 
-@inline function setindex_!(v::VecArray{s,T,dim},vk::Vec{s,T},k::Int64) where {s,T,dim}
+@inline function setindex!(v::VecArray{s,T,dim},vk::Vec{s,T},k::Int64) where {s,T,dim}
     j = s*(k-1)
     @inbounds for is in 1:s
         v.data[is+j] = vk[is]
@@ -45,7 +46,8 @@ end
     return nothing
 end
 
-@inline function setindex_!(v::VecArray{s,T,dim},vk::T2,k::Int64) where {s,T,T2,dim}
+
+@inline function setindex!(v::VecArray{s,T,dim},vk::T2,k::Int64) where {s,T,T2,dim}
     vk_ = convert(T,vk)
     j = s*(k-1)
     @inbounds for is in 1:s

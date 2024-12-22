@@ -64,7 +64,7 @@ sol=solve(prob, nbirkgl16(), adaptive=true, dt = Dtau)
     - if adaptive=true, dt is a constant and specifies the tolerance (Dtau=dt)
     - if adaptive=false, dt is the step size for the integration
 
-- save_on: specifies whether intermediate solutions are saved (default is true)
+- save_everystep: specifies whether intermediate solutions are saved (default is true)
 - adaptive =true (adaptive timestepping); =false (fixed timestepping)
 - maxiters: maximum number of iterations before stopping
 
@@ -312,3 +312,7 @@ https://doi.org/10.1080/00207160.2021.1962848
 ## Contact
 
 If you have any questions or suggestions, feel free to open an issue or contact us at mikel.antonana@ehu.eus.
+
+### 
+
+Updated  December 22, 2024

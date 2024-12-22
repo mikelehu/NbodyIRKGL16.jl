@@ -64,14 +64,7 @@ function IRKNGLstep_fixed_simpl!(ttj, uj,ej, dts, stats, irkgl_cache::NbodyIRKGL
         end
     end
             
-    #for is in 1:s
-    #    nf+=1
-    #    f(F[is], U[is], p,  muladd(sdt,c[is],tj), 1 )
-    #    for k in indices1
-    #        L[is][k] = sdt*(b[is]*F[is][k])
-    #    end
-    #end
-    #
+
     for is in 1:s
         nf+=1
         for k in indices1
@@ -105,7 +98,6 @@ function IRKNGLstep_fixed_simpl!(ttj, uj,ej, dts, stats, irkgl_cache::NbodyIRKGL
 
         for is in 1:s
             nf2+=1
-           #f(F[is], U[is], p,  muladd(sdt,c[is],tj), 2 )
             f(F[is], U[is], p,  muladd(sdt,c[is],tj))
             for k in indices2
                 L[is][k] = sdt*(b[is]*F[is][k])
@@ -124,14 +116,6 @@ function IRKNGLstep_fixed_simpl!(ttj, uj,ej, dts, stats, irkgl_cache::NbodyIRKGL
             end
         end
             
-            
-        #for is in 1:s
-        #    nf+=1
-        #    f(F[is], U[is], p,  muladd(sdt,c[is],tj), 1 )
-        #    for k in indices1
-        #        L[is][k] = sdt*(b[is]*F[is][k])
-        #    end
-        #end
         %
         for is in 1:s
             nf+=1
@@ -156,7 +140,7 @@ function IRKNGLstep_fixed_simpl!(ttj, uj,ej, dts, stats, irkgl_cache::NbodyIRKGL
 
         diffU = false
 
-        for k in indices  
+        for k in indices1  
 
             DY = abs(U[1][k]-U_[1][k])
             for is in 2:s 
@@ -197,7 +181,6 @@ function IRKNGLstep_fixed_simpl!(ttj, uj,ej, dts, stats, irkgl_cache::NbodyIRKGL
         
             for is in 1:s
                 nf2+=1
-                #f(F[is], U[is], p,  muladd(sdt,c[is],tj), 2 )
                 f(F[is], U[is], p,  muladd(sdt,c[is],tj))
                 for k in indices2
                     L[is][k] = sdt*(b[is]*F[is][k])
@@ -214,14 +197,6 @@ function IRKNGLstep_fixed_simpl!(ttj, uj,ej, dts, stats, irkgl_cache::NbodyIRKGL
                 end
             end
         
-        
-            #for is in 1:s
-            #    nf+=1
-            #    f(F[is], U[is], p,  muladd(sdt,c[is],tj), 1 )
-            #    for k in indices1
-            #        L[is][k] = sdt*(b[is]*F[is][k])
-            #    end
-            #end
             #
             for is in 1:s
                 nf+=1
@@ -259,7 +234,7 @@ function IRKNGLstep_fixed_simpl!(ttj, uj,ej, dts, stats, irkgl_cache::NbodyIRKGL
         dts[1]=min(abs(sdt),dtmax)
         dts[2]=dt
 
-        stats.nnonliniter+=j_iter
+        stats.nfpiter+=j_iter
         stats.nf+=nf
         stats.nf2+=nf2
 
@@ -386,10 +361,6 @@ function IRKNGLstep_adap_simpl!(ttj, uj,ej, dts, stats, irkgl_cache::NbodyIRKGL1
 
     @. mu = sdt*a
 
-    #for is in 1:s
-    #    nf+=1
-    #    kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj),1)
-    #end
     #
     for is in 1:s
         nf+=1
@@ -416,7 +387,6 @@ function IRKNGLstep_adap_simpl!(ttj, uj,ej, dts, stats, irkgl_cache::NbodyIRKGL1
 
           for is in 1:s
             nf2+=1
-            #kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj),2)
             kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj))
             aux = muladd(b[is],kf,aux)
             daux = muladd(d[is],kf,daux)
@@ -429,7 +399,6 @@ function IRKNGLstep_adap_simpl!(ttj, uj,ej, dts, stats, irkgl_cache::NbodyIRKGL1
           aux=zero(tT)
           for is in 1:s
             nf2+=1
-            #kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj),2)
             kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj))
             aux = muladd(b[is],kf,aux)
           end
@@ -459,11 +428,6 @@ function IRKNGLstep_adap_simpl!(ttj, uj,ej, dts, stats, irkgl_cache::NbodyIRKGL1
             end
 
             @. mu = sdt*a
-
-            #for is in 1:s
-            #    nf+=1
-            #    kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj),1)
-            #end
             #
             for is in 1:s
                 nf+=1
@@ -486,7 +450,6 @@ function IRKNGLstep_adap_simpl!(ttj, uj,ej, dts, stats, irkgl_cache::NbodyIRKGL1
             aux=zero(tT)
             for is in 1:s
                nf2+=1
-               #kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj), 2)
                kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj))
                aux = muladd(b[is],kf,aux)
             end
@@ -536,11 +499,7 @@ function IRKNGLstep_adap_simpl!(ttj, uj,ej, dts, stats, irkgl_cache::NbodyIRKGL1
         end
            
         @. mu = sdt_new * a
-     
-        #for is in 1:s
-        #     nf+=1
-        #     kf=f(F[is], U[is], p,  muladd(sdt_new,c[is],tj), 1)   
-        #end
+
         #
         for is in 1:s
             nf+=1
@@ -562,7 +521,7 @@ function IRKNGLstep_adap_simpl!(ttj, uj,ej, dts, stats, irkgl_cache::NbodyIRKGL1
       
         diffU = false
    
-        for k in indices 
+        for k in indices1 
    
              DY = abs(U[1][k]-U_[1][k])
              for is in 2:s 
@@ -594,7 +553,6 @@ function IRKNGLstep_adap_simpl!(ttj, uj,ej, dts, stats, irkgl_cache::NbodyIRKGL1
             daux=zero(tT)
             for is in 1:s
                 nf2+=1
-                #kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj), 2)
                 kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj))
                 aux = muladd(b[is],kf,aux)
                 daux = muladd(d[is],kf,daux)
@@ -628,13 +586,8 @@ function IRKNGLstep_adap_simpl!(ttj, uj,ej, dts, stats, irkgl_cache::NbodyIRKGL1
                         end
                     end
         
-
                     @. mu = sdt*a
         
-                    #for is in 1:s
-                    #    nf+=1
-                    #    kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj),1)
-                    #end
                     #
                     for is in 1:s
                         nf+=1
@@ -656,7 +609,6 @@ function IRKNGLstep_adap_simpl!(ttj, uj,ej, dts, stats, irkgl_cache::NbodyIRKGL1
                     aux=zero(tT)
                     for is in 1:s
                        nf2+=1
-                       #kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj), 2)
                        kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj))
                        aux = muladd(b[is],kf,aux)
                     end
@@ -699,7 +651,6 @@ function IRKNGLstep_adap_simpl!(ttj, uj,ej, dts, stats, irkgl_cache::NbodyIRKGL1
            
                 for is in 1:s
                    nf2+=1
-                   #kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj), 2)
                    kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj))
                    K[is] = kf
                 end   
@@ -718,13 +669,6 @@ function IRKNGLstep_adap_simpl!(ttj, uj,ej, dts, stats, irkgl_cache::NbodyIRKGL1
                 end
             end   
             
-            #for is in 1:s
-            #        nf+=1
-            #        kf=f(F[is], U[is], p,  muladd(sdt,c[is],tj), 1)
-            #        for k in indices1
-            #            L[is][k] = sdt*(b[is]*F[is][k])
-            #        end
-            #end
             #
             for is in 1:s
                 nf+=1
@@ -781,7 +725,7 @@ function IRKNGLstep_adap_simpl!(ttj, uj,ej, dts, stats, irkgl_cache::NbodyIRKGL1
             dts[1]=dtaux # A guess for next time-step
             dts[2]=dt
     
-            stats.nnonliniter+=j_iter
+            stats.nfpiter+=j_iter
             stats.nf+=nf
             stats.nf2+=nf2
                 

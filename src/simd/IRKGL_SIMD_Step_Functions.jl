@@ -40,19 +40,19 @@ function IRKGLstep_SIMD_fixed!(ttj, uj,ej,dts,stats,irkgl_cache::NbodyIRKGL16.IR
     if initial_extrap && (step_number>1)
 
       for k in indices
-         Lk = NbodyIRKGL16.getindex_(L,k)
+         Lk=L[k]
          dUk = muladd(nu[1], Lk[1], ej[k])
          for js in 2:s
              dUk = muladd(nu[js], Lk[js], dUk)
          end
-         NbodyIRKGL16.setindex_!(U, uj[k]+dUk, k)
+         U[k]= uj[k]+dUk
       end
 
     else
 
        for k in indices
          uej = uj[k] + ej[k]
-         NbodyIRKGL16.setindex_!(U, uej, k)
+         U[k]= uej
        end
 
     end
@@ -79,16 +79,16 @@ function IRKGLstep_SIMD_fixed!(ttj, uj,ej,dts,stats,irkgl_cache::NbodyIRKGL16.IR
 
          for k in indices
 
-             Fk = NbodyIRKGL16.getindex_(F,k)
+             Fk=F[k]
              Lk = sdt*(b*Fk)
              dUk = muladd(mu[1], Lk[1], ej[k])
              for is in 2:s
                      dUk = muladd(mu[is], Lk[is], dUk)
              end
              Uk = uj[k]+dUk
-             NbodyIRKGL16.setindex_!(U, Uk, k)
-             NbodyIRKGL16.setindex_!(L, Lk, k)
-             Uk_ = NbodyIRKGL16.getindex_(U_,k)
+             U[k]=Uk
+             L[k]=Lk
+             Uk_=U_[k]
              DY = maximum(abs(Uk-Uk_))
 
              if DY>0
@@ -125,15 +125,15 @@ function IRKGLstep_SIMD_fixed!(ttj, uj,ej,dts,stats,irkgl_cache::NbodyIRKGL16.IR
                 f(F, U, p, muladd(sdt,c,tj))
 
                 for k in indices
-                    Fk = NbodyIRKGL16.getindex_(F, k)
+                    Fk=F[k]
                     Lk = sdt*(b*Fk)
-                    NbodyIRKGL16.setindex_!(L, Lk, k)
+                    L[k]=Lk
                 end
         end
 
 
         @inbounds for k in indices    #Equivalent to compensated summation
-            Lk = NbodyIRKGL16.getindex_(L,k)
+            Lk=L[k]
             L_sum = sum(Lk)
             res = Base.TwicePrecision(uj[k], ej[k]) + L_sum
             uj[k] = res.hi
@@ -153,7 +153,7 @@ function IRKGLstep_SIMD_fixed!(ttj, uj,ej,dts,stats,irkgl_cache::NbodyIRKGL16.IR
         dts[1]=min(abs(sdt),dtmax)
         dts[2]=dt
 
-        stats.nnonliniter+=j_iter
+        stats.nfpiter+=j_iter
         stats.nf+=nf
 
     end
@@ -219,12 +219,12 @@ function IRKGLstep_SIMD_adap!(ttj, uj,ej,dts,stats,irkgl_cache::NbodyIRKGL16.IRK
     if initial_extrap && (step_number>1)
 
         for k in indices
-            Lk = NbodyIRKGL16.getindex_(L,k)
+            Lk=L[k]
             dUk = muladd(nu[1], Lk[1], ej[k])
             for js in 2:s
                 dUk = muladd(nu[js], Lk[js], dUk)
             end
-            NbodyIRKGL16.setindex_!(U_, dUk, k)       # U = uj + U_
+            U_[k]=dUk       # U = uj + U_
         end
 
         lambda=dt/dtprev-1
@@ -235,34 +235,34 @@ function IRKGLstep_SIMD_adap!(ttj, uj,ej,dts,stats,irkgl_cache::NbodyIRKGL16.IRK
             
             for j in 1:s+1
 
-                thetaj=NbodyIRKGL16.getindex_(theta,j)
-                omegaj=NbodyIRKGL16.getindex_(omega,j)
+                thetaj=theta[j]
+                omegaj= omega[j]
                 betaj=1/muladd(lambda,thetaj,omegaj)
-                NbodyIRKGL16.setindex_!(alpha, betaj,j)
+                alpha[j]=betaj
                 s_beta+=betaj
 
             end
 
             for j in 1:s+1
-               alphaj=NbodyIRKGL16.getindex_(alpha,j)
-               NbodyIRKGL16.setindex_!(alpha, alphaj/s_beta, j)
+               alphaj= alpha[j]
+               alpha[j]=alphaj/s_beta
             end              
        
             for k in indices
-                dUk=NbodyIRKGL16.getindex_(U_,k)
+                dUk=U_[k]
                 dUik = alpha[1]*ej[k]
                 for js in 1:s
                     dUik = muladd(alpha[js+1], dUk[js], dUik)
                 end
-                NbodyIRKGL16.setindex_!(U, uj[k]+dUik, k)
+                U[k]=uj[k]+dUik
             end
 
 
         else    
 
             for k in indices
-                dUk=NbodyIRKGL16.getindex_(U_,k)
-                NbodyIRKGL16.setindex_!(U, uj[k]+dUk, k)
+                dUk=U_[k]
+                U[k]= uj[k]+dUk
             end
      
         end    
@@ -279,7 +279,7 @@ function IRKGLstep_SIMD_adap!(ttj, uj,ej,dts,stats,irkgl_cache::NbodyIRKGL16.IRK
 
        for k in indices
          uej = uj[k] + ej[k]
-         NbodyIRKGL16.setindex_!(U, uej, k)
+         U[k]= uej
        end
 
        nf+=s
@@ -307,7 +307,7 @@ function IRKGLstep_SIMD_adap!(ttj, uj,ej,dts,stats,irkgl_cache::NbodyIRKGL16.IRK
         if initial_extrap && (step_number>1)
 
             for k in indices
-               NbodyIRKGL16.setindex_!(U, uj[k] + ej[k], k)
+               U[k]=uj[k] + ej[k]
             end
 
             nf+=s
@@ -343,9 +343,9 @@ function IRKGLstep_SIMD_adap!(ttj, uj,ej,dts,stats,irkgl_cache::NbodyIRKGL16.IRK
         U_.data .= U.data
 
         for j in 1:s
-            aj=NbodyIRKGL16.getindex_(a,j)
-            NbodyIRKGL16.setindex_!(mu,sdt*aj,j)
-            muj=NbodyIRKGL16.getindex_(mu,j)
+            aj=a[j]
+            mu[j]=sdt*aj
+            muj=mu[j]
             mujj=muj[j]+c[j]*dsdt
             mu.data[j,j]=mujj
         end
@@ -355,15 +355,15 @@ function IRKGLstep_SIMD_adap!(ttj, uj,ej,dts,stats,irkgl_cache::NbodyIRKGL16.IRK
 
         for k in indices
 
-             Fk = NbodyIRKGL16.getindex_(F,k)
+             Fk=F[k]
              dUk = muladd(mu[1], Fk[1], ej[k])
              for is in 2:s
                      dUk = muladd(mu[is], Fk[is], dUk)
              end
              Uk = uj[k]+dUk
 
-             NbodyIRKGL16.setindex_!(U, Uk, k)
-             Uk_ = NbodyIRKGL16.getindex_(U_,k)
+             U[k]=Uk
+             Uk_=U_[k]
              DY = maximum(abs(Uk-Uk_))
 
              if DY>0
@@ -417,7 +417,7 @@ function IRKGLstep_SIMD_adap!(ttj, uj,ej,dts,stats,irkgl_cache::NbodyIRKGL16.IRK
 
                     for k in indices
                         uej = uj[k] + ej[k]
-                        setindex_!(U, uej, k)
+                        U[k]=uej
                     end
 
                     nf+=s
@@ -458,11 +458,6 @@ function IRKGLstep_SIMD_adap!(ttj, uj,ej,dts,stats,irkgl_cache::NbodyIRKGL16.IRK
 
     end  
 
-    #if (j_iter==1)
-    #    @warn "Numerical integration interrupted. \n The value of Dtau=$Dtau appears to be too small. Please try again with a greater value of dt"
-    #    step_retcode=false
-    #end
-
     if  step_retcode
 
         @inbounds if (j_iter<maxiters && diffU) 
@@ -477,9 +472,9 @@ function IRKGLstep_SIMD_adap!(ttj, uj,ej,dts,stats,irkgl_cache::NbodyIRKGL16.IRK
 
         @inbounds for k in indices    #Equivalent to compensated summation
 
-            Fk = NbodyIRKGL16.getindex_(F, k)
+            Fk=F[k]
             Lk = sdt*(b*Fk)
-            NbodyIRKGL16.setindex_!(L, Lk, k)
+            L[k]=Lk
             L_sum = sum(Lk)
             res = Base.TwicePrecision(uj[k], ej[k]) + L_sum
             uj[k] = res.hi
@@ -498,8 +493,8 @@ function IRKGLstep_SIMD_adap!(ttj, uj,ej,dts,stats,irkgl_cache::NbodyIRKGL16.IRK
 
 
         for j in 1:s
-            aj=NbodyIRKGL16.getindex_(a,j)
-            NbodyIRKGL16.setindex_!(mu,dt*aj,j)
+            aj=a[j]
+            mu[j]=dt*aj
         end
 
         Tau=muladd(mu[1],K[1],0)
@@ -510,29 +505,15 @@ function IRKGLstep_SIMD_adap!(ttj, uj,ej,dts,stats,irkgl_cache::NbodyIRKGL16.IRK
         logK=log(K)
     
         K=NbodyIRKGL16.PolInterp!(K, Kinv, Tau, logK, s, Tau_)  # Tau_ = (1+c)*Dtau
-        #for i in 1:s
-        #    pz=NbodyIRKGL16.PolInterp(Tau,logK,s,Tau_[i])
-        #    K=Base.setindex(K,pz,i)
-        #end
 
         Kinv = exp(-K)
-
-        #if sum(Kinv)==Inf
-
-        #    @warn "Numerical integration interrupted. \n The value of dt=$Dtau appears to be too small. Please try again with a greater value of dt"
-        #    step_retcode=false
-
-        #else
-
         dtaux= NbodyIRKGL16.Rdigits(Dtau*sum(b*Kinv),R)
 
         dts[1]=dtaux  # A guess for next time-step
         dts[2]=dt
 
-        stats.nnonliniter+=j_iter
+        stats.nfpiter+=j_iter
         stats.nf+=nf
-        
-        #end
 
     end
 

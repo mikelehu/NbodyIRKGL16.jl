@@ -165,7 +165,7 @@ function IRKGLstep_fixed!(ttj,uj,ej,dts,stats,irkgl_cache::NbodyIRKGL16.IRKGL_Ca
         dts[1]=min(abs(sdt),dtmax)
         dts[2]=dt
 
-        stats.nnonliniter+=j_iter
+        stats.nfpiter+=j_iter
         stats.nf+=nf
 
     end
@@ -478,10 +478,6 @@ function IRKGLstep_adap!(ttj,uj,ej,dts,stats,irkgl_cache::NbodyIRKGL16.IRKGL_Cac
             step_retcode=false
     end   
     
-    #if (j_iter==1)
-    #    @warn "Numerical integration interrupted. \n The value of Dtau=$Dtau appears to be too small. Please try again with a greater value of dt"
-    #    step_retcode=false
-    #end
 
     if  step_retcode
     
@@ -542,13 +538,6 @@ function IRKGLstep_adap!(ttj,uj,ej,dts,stats,irkgl_cache::NbodyIRKGL16.IRKGL_Cac
         
         NbodyIRKGL16.PolInterp!(K, Kinv, Tau, logK, s, Tau_)  # Tau_ = (1+c)*Dtau
         @. Kinv = exp(-K)
-
-        #if sum(Kinv)==Inf
-
-        #    @warn "Numerical integration interrupted. \n The value of dt=$Dtau appears to be too small. Please try again with a greater value of dt"
-        #    step_retcode=false
-
-        #else
             
         dtaux = zero(tT)
         for js in 1:s
@@ -559,10 +548,9 @@ function IRKGLstep_adap!(ttj,uj,ej,dts,stats,irkgl_cache::NbodyIRKGL16.IRKGL_Cac
         dts[1]=dtaux  # A guess for next time-step
         dts[2]=dt
             
-        stats.nnonliniter+=j_iter
+        stats.nfpiter+=j_iter
         stats.nf+=nf
-        
-        #end
+
 
     end
         
