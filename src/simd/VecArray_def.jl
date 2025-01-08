@@ -9,7 +9,8 @@ Base.eltype(::Type{VecArray{s,T,dim}}) where {s,T,dim} = T
 
 
 @inline function Base.getindex(v::VecArray{s,T,dim},k...) where {s,T,dim}
-    Vec{s,T}(NTuple{s,T}(@inbounds v.data[is,k...] for is=1:s))
+#    Vec{s,T}(NTuple{s,T}(@inbounds v.data[is,k...] for is=1:s))
+    Vec{s,T}(ntuple(is -> @inbounds(v.data[is,k...]), s))
 end
 
 
@@ -33,7 +34,8 @@ end
 
 @inline function getindex(v::VecArray{s,T,dim},k::Int64) where {s,T,dim}
     j = s*(k-1)
-    Vec{s,T}(NTuple{s,T}(@inbounds v.data[is+j] for is=1:s))
+#    Vec{s,T}(NTuple{s,T}(@inbounds v.data[is+j] for is=1:s))
+    Vec{s,T}(ntuple(is -> @inbounds(v.data[is+j]), s))
 
 end
 
